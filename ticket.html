@@ -1,0 +1,814 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Your Ticket — Student Council Public Hearing</title>
+<!--
+  STUDENT COUNCIL HEARING — TICKET PAGE
+  Adapted from CE Night (ICE-Socialization-Night/index.html) ticket page:
+  single static file, URL params from the Tally redirect, qrcodejs QR,
+  html2canvas export via a filter-free CLONE with literal gradients,
+  canvas-QR swapped to <img> for reliable capture.
+  Per-department theming: see docs/01-TOKEN-TABLES.md (reviewed/approved).
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,600;1,500;1,600&family=Oswald:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<style>
+  * { box-sizing: border-box; }
+  /*
+   * PAULINIAN GREEN page chrome (ticket-design-spec.md is the single visual
+   * source for the whole system): forest-green base, vignette, faint light
+   * streaks, cream serif/condensed typography, gold functional accents.
+   * Per-department tokens apply ONLY inside the ticket card itself.
+   */
+  :root {
+    --sys-deepest: #0C2C1D;
+    --sys-base:    #11402A;
+    --sys-mid:     #1A6140;
+    --sys-glow:    #33C17F;
+    --cream:       #F4F5ED;
+    --gold:        #DBBE66;
+  }
+  html, body {
+    margin: 0;
+    min-height: 100vh;
+    background-color: var(--sys-deepest);
+    background-image:
+      radial-gradient(120% 80% at 50% 0%, rgba(51,193,127,0.16), rgba(12,44,29,0) 55%),
+      radial-gradient(ellipse 120% 100% at 50% 55%, rgba(0,0,0,0) 50%, rgba(5,18,12,0.6) 100%),
+      repeating-linear-gradient(115deg, rgba(244,245,237,0.024) 0 2px, transparent 2px 110px),
+      linear-gradient(168deg, var(--sys-base) 0%, var(--sys-deepest) 72%);
+    background-attachment: fixed;
+    font-family: 'Oswald', sans-serif;
+    color: var(--cream);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 26px 0 48px;
+  }
+  .page-eyebrow {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px; letter-spacing: 0.26em; text-transform: uppercase;
+    color: var(--gold); margin-bottom: 18px; text-align: center; padding: 0 14px;
+  }
+
+  /* ============================ CARD GEOMETRY ============================
+     Fixed 900 x 560 design canvas, scaled to the screen with a wrapper.
+       ribbon height  56px   = 10.0% of canvas height (560)
+       panel margins  33px   = 3.7% of canvas width  (900)
+       corner radius  17px   = 3.0% of shorter side  (560)
+       hairline       3px    = 2.5-3px cream band, all 8 departments
+       ribbon tilt    -3.12deg, structural constant
+  */
+  .scale-wrap { width: 100%; display: flex; justify-content: center; }
+  .stage { position: relative; width: 900px; height: 560px; }
+  #card {
+    position: relative; width: 900px; height: 560px; border-radius: 17px;
+    overflow: hidden; filter: drop-shadow(0 24px 50px rgba(0,0,0,0.6));
+    transform-origin: top left;
+  }
+  .fx-canvas {
+    position: absolute; inset: 0; z-index: 9; pointer-events: none;
+  }
+
+  /* ---- full-bleed diagonal ribbon, pinned to the panel's top edge ---- */
+  .ribbon {
+    position: absolute; top: 64px; left: -22px; right: -22px; height: 56px;
+    transform: rotate(-3.12deg); transform-origin: 50% 50%;
+    border-top: 3px solid #F4F5ED;      /* cream hairline — CONSTANT */
+    border-bottom: 3px solid #F4F5ED;   /* cream hairline — CONSTANT */
+    box-shadow: 0 10px 24px rgba(0,0,0,0.35);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 4;
+  }
+  .ribbon-plate {
+    position: absolute; left: 50%; top: 50%;
+    transform: translate(-50%, -50%);
+    padding: 4px 30px; border-radius: 4px;
+    /* box-shadow set inline: hard drop + soft glow (dark-plate rule) */
+  }
+  .ribbon-title {
+    position: relative; z-index: 2;
+    font-family: 'Oswald', sans-serif; font-weight: 700; font-size: 30px;
+    letter-spacing: 0.14em; text-transform: uppercase; white-space: nowrap;
+  }
+
+  /* ---- frosted rounded panel, top edge collinear with ribbon top ---- */
+  .panel {
+    position: absolute; left: 33px; right: 33px; top: 64px; bottom: 70px;
+    background: rgba(255,255,255,0.06);
+    border: 2px solid rgba(255,255,255,0.5);
+    border-radius: 17px;
+    backdrop-filter: blur(10px) saturate(1.25);
+    -webkit-backdrop-filter: blur(10px) saturate(1.25);
+    z-index: 3;
+  }
+  .panel-inner { position: absolute; inset: 0; padding: 74px 26px 14px; }
+
+  /* ---- header strip inside the panel, below the ribbon ---- */
+  .head-row {
+    display: flex; align-items: center; gap: 12px;
+  }
+  .head-titles { flex: 1; text-align: left; }
+  .head-event {
+    font-family: 'IBM Plex Mono', monospace; font-size: 10px;
+    letter-spacing: 0.24em; text-transform: uppercase;
+    color: rgba(244,245,237,0.75);
+  }
+  .head-council {
+    font-size: 15px; font-weight: 600; letter-spacing: 0.18em;
+    text-transform: uppercase; margin-top: 2px;
+  }
+  .dept-icon { width: 34px; height: 34px; flex-shrink: 0; }
+  .dept-icon svg { width: 100%; height: 100%; display: block; }
+
+  .seal-ph {
+    width: 34px; height: 34px; border-radius: 50%; flex-shrink: 0;
+    border: 1.5px dashed rgba(244,245,237,0.45);
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'IBM Plex Mono', monospace; font-size: 7px;
+    letter-spacing: 0.12em; color: rgba(244,245,237,0.5);
+  }
+
+  /* ---- body grid ---- */
+  .body-grid {
+    display: grid; grid-template-columns: 1fr 200px; gap: 18px;
+    margin-top: 18px;
+  }
+  .field { margin-bottom: 12px; }
+  .field .label {
+    display: block; font-family: 'IBM Plex Mono', monospace; font-size: 9px;
+    letter-spacing: 0.2em; text-transform: uppercase; margin-bottom: 2px;
+  }
+  .field .value { font-size: 24px; font-weight: 500; line-height: 1.15; }
+  .field .value.md { font-size: 15px; }
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .code-chip {
+    display: inline-block; padding: 4px 12px; border-radius: 5px;
+    border: 1.5px solid rgba(244,245,237,0.55);
+    font-family: 'IBM Plex Mono', monospace; font-size: 16px; font-weight: 600;
+    letter-spacing: 0.1em;
+  }
+  .tid {
+    font-family: 'IBM Plex Mono', monospace; font-size: 11.5px;
+    letter-spacing: 0.05em; color: rgba(244,245,237,0.85); word-break: break-all;
+  }
+  .qr-block { text-align: center; }
+  .qr-box {
+    background: #F4F5ED; padding: 8px; border-radius: 8px;
+    display: inline-block; line-height: 0;
+  }
+  .qr-box img { width: 132px; height: 132px; display: block; }
+  .qr-cap {
+    font-family: 'IBM Plex Mono', monospace; font-size: 8.5px;
+    letter-spacing: 0.2em; text-transform: uppercase;
+    color: rgba(244,245,237,0.6); margin-top: 7px;
+  }
+
+  .motto {
+    position: absolute; left: 26px; right: 226px; bottom: 12px;
+    font-family: 'Playfair Display', serif; font-style: italic; font-size: 15px;
+    color: rgba(244,245,237,0.8);
+  }
+
+  /* ---- footer bar: dark department gradient ---- */
+  .footer {
+    position: absolute; left: 0; right: 0; bottom: 0; height: 56px;
+    display: flex; align-items: center; padding: 0 26px; gap: 12px;
+    z-index: 5;
+  }
+  .footer .seal-ph { width: 30px; height: 30px; font-size: 6.5px; }
+  .footer-meta {
+    flex: 1; font-family: 'IBM Plex Mono', monospace; font-size: 9.5px;
+    letter-spacing: 0.14em; text-transform: uppercase;
+    color: rgba(244,245,237,0.7);
+  }
+  .credit {
+    font-family: 'IBM Plex Mono', monospace; font-size: 9px;
+    letter-spacing: 0.1em; text-transform: uppercase;
+    color: rgba(244,245,237,0.45);
+  }
+  .below-credit {
+    width: 100%; text-align: right; padding: 8px 6px 0;
+    font-family: 'IBM Plex Mono', monospace; font-size: 9px;
+    letter-spacing: 0.1em; text-transform: uppercase;
+    color: rgba(244,245,237,0.4);
+  }
+
+  /* ---- page chrome ---- */
+  .footer-note {
+    max-width: 560px; text-align: center; font-size: 13px; line-height: 1.7;
+    color: rgba(244,245,237,0.6); margin: 22px 14px 0;
+    font-weight: 400;
+  }
+  .save-btn, .agenda-btn {
+    margin-top: 18px; font-family: 'Oswald', sans-serif; font-size: 12px;
+    font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase;
+    background: transparent;
+    color: var(--cream); border: 1.5px solid rgba(219,190,102,0.55);
+    padding: 12px 24px; border-radius: 6px; cursor: pointer; transition: all .2s;
+  }
+  .save-btn:hover, .agenda-btn:hover { background: rgba(219,190,102,0.16); border-color: var(--gold); color: var(--gold); }
+  .save-btn:disabled { opacity: 0.5; cursor: default; }
+  .btn-row { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
+
+  #agenda-box {
+    display: none; width: min(92vw, 720px); margin-top: 22px;
+    background: linear-gradient(160deg, rgba(26,97,64,0.4), rgba(12,44,29,0.58));
+    border: 1.5px solid rgba(244,245,237,0.3); border-radius: 16px;
+    box-shadow: 0 14px 34px rgba(0,0,0,0.4), inset 0 2px 0 rgba(244,245,237,0.3);
+    padding: 18px 22px; color: var(--cream);
+  }
+  #agenda-box h3 {
+    margin: 0 0 4px; font-family: 'Playfair Display', serif; font-size: 15px;
+    letter-spacing: 0.16em; text-transform: uppercase; font-weight: 600;
+  }
+  #agenda-box .tz { font-family: 'IBM Plex Mono', monospace; font-size: 9.5px; color: rgba(244,245,237,0.55); }
+  #agenda-box table { width: 100%; border-collapse: collapse; margin-top: 12px; }
+  #agenda-box td {
+    padding: 7px 6px; border-top: 1px dashed rgba(244,245,237,0.18);
+    font-size: 13px; vertical-align: top; font-weight: 400;
+  }
+  #agenda-box td.t { font-family: 'IBM Plex Mono', monospace; font-size: 11px; white-space: nowrap; color: var(--gold); }
+  #agenda-box .owner { color: rgba(244,245,237,0.6); font-size: 11.5px; }
+
+  .state-card {
+    width: min(92vw, 560px); padding: 42px 30px; text-align: center;
+    background: linear-gradient(160deg, rgba(26,97,64,0.42), rgba(12,44,29,0.62));
+    border: 1.5px solid rgba(244,245,237,0.32); border-radius: 16px;
+    box-shadow: 0 18px 44px rgba(0,0,0,0.5), inset 0 2px 0 rgba(244,245,237,0.38);
+  }
+  .state-card .sc-title {
+    font-size: 15px; letter-spacing: 0.16em; text-transform: uppercase;
+    font-family: 'Oswald', sans-serif; font-weight: 600; margin-bottom: 14px;
+  }
+  .state-card .sc-body { font-size: 14px; color: rgba(244,245,237,0.65); line-height: 1.8; }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .stage { animation: rise 0.6s ease-out; }
+  }
+  @keyframes rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: translateY(0); } }
+</style>
+</head>
+<body>
+
+<div class="page-eyebrow">SPUP · Joint Student Council · Public Hearing 2026</div>
+
+<div class="scale-wrap" id="scale-wrap">
+  <div class="stage" id="stage">
+    <div id="card"></div>
+    <canvas class="fx-canvas" id="fx" width="900" height="560"></canvas>
+  </div>
+</div>
+
+<div style="width:100%;display:flex;justify-content:center;">
+  <div class="below-credit" id="below-credit" style="display:none;"></div>
+</div>
+
+<div class="btn-row" id="btn-row" style="display:none;">
+  <button class="save-btn" id="save-btn">Save Ticket as Image</button>
+  <button class="agenda-btn" id="agenda-btn">View Hearing Agenda</button>
+</div>
+<div id="agenda-box"></div>
+
+<p class="footer-note">
+  This ticket is your <strong>attendance record</strong> — present the QR at check-in.
+  The QR encodes only your anonymous ticket ID, never your name or student number.
+</p>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script>
+/* =============================== CONFIG ================================== */
+const APPS_SCRIPT_URL = 'PASTE_APPS_SCRIPT_EXEC_URL_HERE';
+const REG_SALT        = 'PASTE_REG_SALT_FROM_ONBOARD_LOG_HERE';
+
+const EVENT = {
+  eyebrow: 'Joint Student Council · Public Hearing · SY 2026–2027',
+  ribbonTitle: 'Public Hearing',
+  motto: 'Order through dialogue, unity through voice.',
+  footerMeta: 'SPUP · One-day hearing · Doors 8:00 AM',
+};
+
+/* Credit line: discreet, clear of ribbon/panel artwork. Position is
+   configurable here: 'footer-right' | 'footer-left' | 'below-card'. */
+const CREDIT = { text: 'Registration by PSG-ICE', position: 'footer-right' };
+
+/* ===================== DEPARTMENT TOKEN TABLES ===========================
+   Derived in tools/compute_tokens.py from the spec's luminance RELATIONSHIPS
+   (deepest 15% / base 27% / mid 38% / glow 58% / ribbon 33%→17% /
+   plate 12% / footer 20%→10%). Full tables: docs/01-TOKEN-TABLES.md.
+   Hairline + QR panel cream #F4F5ED is constant across all 8 (structural).
+   =========================================================================*/
+const THEMES = {
+  'PSG Uniwide': { key: 'uniwide', accent: '#DBBE66', deepest: '#123A25', base: '#216942', mid: '#2F935E', glow: '#5CCC90', ribbonLeft: '#288051', ribbonRight: '#15422A', plate: '#17271E', footerTop: '#184E31', footerBottom: '#0C2719', fx: 'burst',    icon: 'star' },
+  'PSG ICE':     { key: 'ice',     accent: '#DBBE66', deepest: '#211439', base: '#3C2466', mid: '#54328F', glow: '#8660C7', ribbonLeft: '#492C7D', ribbonRight: '#261740', plate: '#1D1726', footerTop: '#2C1B4B', footerBottom: '#160D26', fx: 'sweep',    icon: 'truss' },
+  'PSG SASTE':   { key: 'saste',   accent: '#DBBE66', deepest: '#0F263D', base: '#1C456E', mid: '#27619B', glow: '#5494D4', ribbonLeft: '#225487', ribbonRight: '#112B45', plate: '#151F28', footerTop: '#143352', footerBottom: '#0A1929', fx: 'pulse',    icon: 'book' },
+  'PSG SNAHS':   { key: 'snahs',   accent: '#DBBE66', deepest: '#3C1014', base: '#6D1D24', mid: '#992932', glow: '#D25660', ribbonLeft: '#85232B', ribbonRight: '#441216', plate: '#271617', footerTop: '#51151A', footerBottom: '#280B0D', fx: 'sprinkle', icon: 'pulse' },
+  'PSG SBAHM':    { key: 'sbahm',    accent: '#DBBE66', deepest: '#13391B', base: '#226730', mid: '#309144', glow: '#5EC974', ribbonLeft: '#2A7E3B', ribbonRight: '#16411E', plate: '#17261A', footerTop: '#194D24', footerBottom: '#0D2612', fx: 'sweep',    icon: 'handshake' },
+  'PSG SITE':    { key: 'site',    accent: '#DBBE66', deepest: '#22262A', base: '#3E444C', mid: '#57606B', glow: '#89939F', ribbonLeft: '#4C545D', ribbonRight: '#272B30', plate: '#1D1E20', footerTop: '#2E3338', footerBottom: '#17191C', fx: 'burst',    icon: 'code' },
+  'SOM':         { key: 'som',     accent: '#DEE0E3', deepest: '#20252C', base: '#3A4350', mid: '#515E70', glow: '#969EA6', ribbonLeft: '#BDC2C7', ribbonRight: '#757F8A', plate: '#1C1E21', footerTop: '#2B313B', footerBottom: '#15191E', fx: 'pulse',    icon: 'stethoscope' },
+  'PSG BEU':     { key: 'beu',     accent: '#F4F5ED', deepest: '#463107', base: '#7D580C', mid: '#B07B11', glow: '#ECB13C', ribbonLeft: '#996B0F', ribbonRight: '#4F3708', plate: '#2B2312', footerTop: '#5D4109', footerBottom: '#2E2005', fx: 'burst',    icon: 'crayon' },
+};
+
+/* ================== PER-DEPARTMENT LINE ICONS =============================
+   ONE treatment budget for all 8: 24x24 viewBox, stroke 1.7, round caps,
+   no fills, accent color, fixed position (panel header, right side).
+   Original marks — NOT any actual university/PSG seals.
+   ===========================================================================*/
+const ICONS = {
+  star:        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.4l2.55 5.6 6.05.55-4.55 4.05 1.35 5.95-5.4-3.1-5.4 3.1 1.35-5.95L3.4 9.55l6.05-.55z"/></svg>',
+  truss:       '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 19h19"/><path d="M5 19V10.5h14V19"/><path d="M9.67 10.5V19M14.33 10.5V19"/><path d="M5 10.5l4.67 8.5M9.67 10.5l4.66 8.5M14.33 10.5L19 19"/></svg>',
+  book:        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 7C10.2 5.4 7.3 5.1 5 5.6V18c2.3-.5 5.2-.2 7 1.4 1.8-1.6 4.7-1.9 7-1.4V5.6C16.7 5.1 13.8 5.4 12 7z"/><path d="M12 7v12.4"/><path d="M15.9 3.9l2.1 2.1-4.6 4.6-2.6.4.4-2.6z"/></svg>',
+  pulse:       '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 12h3.8l2-5.2 3.2 10.4 2.1-6.4 1.3 1.2h4.6"/><circle cx="21" cy="12" r="1.2"/></svg>',
+  handshake:   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 9.5h4l4.2 4.2"/><path d="M21.5 9.5h-4l-2.5 2.5"/><path d="M10.7 13.7L12 15l1.3-1.3"/><path d="M12 15l1.9 1.9a1.25 1.25 0 0 0 1.77 0l.83-.83"/><path d="M8.5 15.5h.01"/></svg>',
+  code:        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M8.4 8L4.4 12l4 4"/><path d="M15.6 8l4 4-4 4"/><path d="M13.2 5.5l-2.4 13"/></svg>',
+  stethoscope: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M5.2 3.5v4.8a4.8 4.8 0 0 0 9.6 0V3.5"/><path d="M3.6 3.5h1.6M16.4 3.5H18"/><path d="M10 13.1v3a4.6 4.6 0 0 0 9.2 0v-1.6"/><circle cx="19.2" cy="11.6" r="2.3"/></svg>',
+  crayon:      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4.8 19.2L15.9 8.1l2.9 2.9L7.7 22.1l-4 .7z"/><path d="M15.9 8.1l1.6-1.6a1.6 1.6 0 0 1 2.25 0l.65.65a1.6 1.6 0 0 1 0 2.25L18.8 11"/><path d="M13.6 10.4l2.9 2.9"/></svg>',
+};
+
+/* ============================ FX — ONE ENGINE =============================
+   A single celebration engine, per-department parameters only (color +
+   pattern). Decorative, one-time, and it NEVER touches ticket content:
+     - content + QR are rendered and exportable BEFORE the engine starts
+     - the FX canvas is a SIBLING of #card, so it can never appear in the
+       html2canvas clone (we capture #card only); it is also hidden during
+       capture as belt-and-braces.
+     - any failure inside the engine is swallowed; the ticket stays usable.
+   ==========================================================================*/
+function after(sec) { return new Promise(function (r) { setTimeout(r, sec * 1000); }); }
+
+const FX = (function () {
+  function rnd(a, b) { return a + Math.random() * (b - a); }
+
+  function burst(ctx, W, H, color, t, dur, parts) {
+    if (!parts.list) {
+      parts.list = [];
+      for (let i = 0; i < 110; i++) {
+        const a = rnd(0, Math.PI * 2), v = rnd(3.5, 9);
+        parts.list.push({ x: W / 2, y: 92, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 2,
+          r: rnd(1.5, 3.4), rot: rnd(0, 6.3), vr: rnd(-0.2, 0.2),
+          c: Math.random() < 0.25 ? '#F4F5ED' : color });
+      }
+    }
+    ctx.clearRect(0, 0, W, H);
+    for (const p of parts.list) {
+      p.x += p.vx; p.y += p.vy; p.vy += 0.16; p.vx *= 0.985; p.rot += p.vr;
+      const alpha = Math.max(0, 1 - t / dur);
+      ctx.save(); ctx.globalAlpha = alpha; ctx.translate(p.x, p.y); ctx.rotate(p.rot);
+      ctx.fillStyle = p.c; ctx.fillRect(-p.r, -p.r / 2, p.r * 2, p.r);
+      ctx.restore();
+    }
+  }
+
+  function sweep(ctx, W, H, color, t, dur) {
+    ctx.clearRect(0, 0, W, H);
+    const p = t / dur;
+    if (p > 1) return;
+    const x = -220 + (W + 440) * p;
+    ctx.save();
+    ctx.globalAlpha = Math.min(1, 4 * p * (1 - p));
+    const grad = ctx.createLinearGradient(x - 110, 0, x + 110, 0);
+    grad.addColorStop(0, 'rgba(255,255,255,0)');
+    grad.addColorStop(0.5, color);
+    grad.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.translate(W / 2, H / 2); ctx.rotate(-18 * Math.PI / 180); ctx.translate(-W / 2, -H / 2);
+    ctx.fillStyle = grad; ctx.fillRect(x - 110, -H, 220, H * 3);
+    ctx.restore();
+  }
+
+  function pulse(ctx, W, H, color, t, dur) {
+    ctx.clearRect(0, 0, W, H);
+    const p = Math.min(1, t / dur);
+    const cx = W / 2, cy = 92;
+    for (let i = 0; i < 3; i++) {
+      const pp = Math.min(1, Math.max(0, p * 1.35 - i * 0.16));
+      ctx.beginPath();
+      ctx.arc(cx, cy, 30 + pp * 420, 0, Math.PI * 2);
+      ctx.strokeStyle = color;
+      ctx.globalAlpha = Math.max(0, (1 - pp) * 0.5);
+      ctx.lineWidth = 2.5;
+      ctx.stroke();
+    }
+    ctx.globalAlpha = Math.max(0, 0.35 * (1 - p));
+    const rg = ctx.createRadialGradient(cx, cy, 10, cx, cy, 260);
+    rg.addColorStop(0, color); rg.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = rg; ctx.fillRect(0, 0, W, H);
+    ctx.globalAlpha = 1;
+  }
+
+  function sprinkle(ctx, W, H, color, t, dur, parts) {
+    if (!parts.list) {
+      parts.list = [];
+      for (let i = 0; i < 70; i++) {
+        parts.list.push({ x: rnd(0, W), y: 92 - rnd(0, 30), vy: rnd(1.2, 3.4),
+          vx: rnd(-0.5, 0.5), r: rnd(1.2, 2.6), delay: rnd(0, dur * 0.4),
+          c: Math.random() < 0.3 ? '#F4F5ED' : color });
+      }
+    }
+    ctx.clearRect(0, 0, W, H);
+    for (const p of parts.list) {
+      if (t < p.delay) continue;
+      p.x += p.vx; p.y += p.vy;
+      const alpha = Math.max(0, 1 - (t - p.delay) / (dur * 0.8));
+      ctx.globalAlpha = alpha * 0.9; ctx.fillStyle = p.c;
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  const PATTERNS = { burst, sweep, pulse, sprinkle };
+
+  return function run(opts) { // opts: {canvas, color, pattern, duration}
+    try {
+      if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+      if (document.hidden) return;
+      const canvas = opts.canvas, ctx = canvas.getContext('2d');
+      const fn = PATTERNS[opts.pattern] || burst;
+      const dur = opts.duration || 2.4;
+      const parts = {};
+      let t0 = null;
+      function frame(ts) {
+        if (t0 === null) t0 = ts;
+        const t = (ts - t0) / 1000;
+        fn(ctx, canvas.width, canvas.height, opts.color, t, dur, parts);
+        if (t < dur + 0.6) requestAnimationFrame(frame);
+        else { ctx.clearRect(0, 0, canvas.width, canvas.height); canvas.style.display = 'none'; }
+      }
+      requestAnimationFrame(frame);
+    } catch (e) { /* FX is decorative — the ticket must never depend on it. */ }
+  };
+})();
+
+/* ============================ RENDER ===================================== */
+function $(id) { return document.getElementById(id); }
+function el(tag, cls) { const e = document.createElement(tag); if (cls) e.className = cls; return e; }
+function hexToRgba(hex, a) {
+  const h = hex.replace('#', '');
+  const r = parseInt(h.substr(0, 2), 16), g = parseInt(h.substr(2, 2), 16), b = parseInt(h.substr(4, 2), 16);
+  return 'rgba(' + r + ',' + g + ',' + b + ',' + a + ')';
+}
+
+let CURRENT = null; // {ticket, theme}
+
+function renderThemeSkeleton(card, theme) {
+  card.style.background = 'linear-gradient(155deg, ' + theme.deepest + ' 0%, ' + theme.base + ' 58%, ' + theme.mid + ' 125%)';
+
+  // header centre glow (token: glow at 55-60% luminance)
+  const glow = el('div');
+  glow.style.cssText = 'position:absolute;inset:0;z-index:1;background:radial-gradient(ellipse 60% 46% at 50% 17%,' +
+    hexToRgba(theme.glow, 0.34) + ', rgba(0,0,0,0) 70%);';
+  card.appendChild(glow);
+
+  // frosted panel, top edge collinear with ribbon top edge (64)
+  const panel = el('div', 'panel');
+  card.appendChild(panel);
+  const inner = el('div', 'panel-inner');
+  panel.appendChild(inner);
+
+  // ---- ribbon (pinned to + overhanging the panel; cream hairlines) ----
+  const ribbon = el('div', 'ribbon');
+  ribbon.style.background = 'linear-gradient(100deg, ' + theme.ribbonLeft + ' 0%, ' + theme.ribbonRight + ' 115%)';
+  const plate = el('div', 'ribbon-plate');
+  plate.style.background = theme.plate;
+  plate.style.boxShadow = '6px 6px 0 rgba(0,0,0,0.5), 0 0 26px ' + hexToRgba(theme.glow, 0.55);
+  const title = el('div', 'ribbon-title');
+  title.style.color = theme.accent;
+  title.textContent = EVENT.ribbonTitle;
+  plate.appendChild(title);
+  ribbon.appendChild(plate);
+  card.appendChild(ribbon);
+
+  // ---- footer bar (department dark gradient) ----
+  const footer = el('div', 'footer');
+  footer.style.background = 'linear-gradient(180deg, ' + theme.footerTop + ' 0%, ' + theme.footerBottom + ' 100%)';
+  card.appendChild(footer);
+
+  return { panel: inner, footer: footer };
+}
+
+function fillTicket(ticket, theme) {
+  const card = $('card');
+  card.innerHTML = '';
+  const parts = renderThemeSkeleton(card, theme);
+
+  /* header strip: seal placeholder | titles | department icon (FIXED
+     position: panel header, right side — identical across all 8) */
+  const head = el('div', 'head-row');
+  const seal = el('div', 'seal-ph'); seal.textContent = 'SEAL';
+  const titles = el('div', 'head-titles');
+  const ev = el('div', 'head-event'); ev.textContent = EVENT.eyebrow;
+  const cn = el('div', 'head-council'); cn.textContent = ticket.council; cn.style.color = theme.accent;
+  titles.appendChild(ev); titles.appendChild(cn);
+  const icon = el('div', 'dept-icon');
+  icon.style.color = theme.accent;
+  icon.innerHTML = ICONS[theme.icon];
+  head.appendChild(seal); head.appendChild(titles); head.appendChild(icon);
+  parts.panel.appendChild(head);
+
+  /* body grid */
+  const grid = el('div', 'body-grid');
+  const left = el('div');
+  function field(label, value, cls) {
+    const f = el('div', 'field');
+    const l = el('span', 'label'); l.textContent = label; l.style.color = theme.accent;
+    const v = el('div', 'value' + (cls ? ' ' + cls : '')); v.textContent = value; v.style.color = '#F4F5ED';
+    f.appendChild(l); f.appendChild(v); return f;
+  }
+  left.appendChild(field('Attendee', ticket.name));
+  const two = el('div', 'two-col');
+  two.appendChild(field('Council', ticket.council, 'md'));
+  two.appendChild(field('Position', ticket.position || '—', 'md'));
+  left.appendChild(two);
+  const cf = el('div', 'field');
+  const cl = el('span', 'label'); cl.textContent = 'Lookup Code'; cl.style.color = theme.accent;
+  const chip = el('span', 'code-chip'); chip.textContent = ticket.shortCode; chip.style.color = '#F4F5ED';
+  cf.appendChild(cl); cf.appendChild(chip); left.appendChild(cf);
+  const tf = el('div', 'field');
+  const tl = el('span', 'label'); tl.textContent = 'Ticket ID'; tl.style.color = theme.accent;
+  const tid = el('div', 'tid'); tid.textContent = ticket.id;
+  tf.appendChild(tl); tf.appendChild(tid); left.appendChild(tf);
+
+  const right = el('div', 'qr-block');
+  const qb = el('div', 'qr-box'); qb.id = 'qrcode';
+  const cap = el('div', 'qr-cap'); cap.textContent = 'Scan at check-in';
+  right.appendChild(qb); right.appendChild(cap);
+
+  grid.appendChild(left); grid.appendChild(right);
+  parts.panel.appendChild(grid);
+
+  const motto = el('div', 'motto'); motto.textContent = '“' + EVENT.motto + '”';
+  parts.panel.appendChild(motto);
+
+  /* footer: seal placeholder | meta | credit (position configurable) */
+  const fseal = el('div', 'seal-ph'); fseal.textContent = 'SEAL';
+  const meta = el('div', 'footer-meta'); meta.textContent = EVENT.footerMeta;
+  const credit = el('span', 'credit'); credit.textContent = CREDIT.text;
+  parts.footer.appendChild(fseal);
+  if (CREDIT.position === 'footer-left') parts.footer.appendChild(credit);
+  parts.footer.appendChild(meta);
+  if (CREDIT.position === 'footer-right') parts.footer.appendChild(credit);
+  if (CREDIT.position === 'below-card') {
+    const bc = $('below-credit'); bc.style.display = 'block'; bc.textContent = CREDIT.text;
+  }
+
+  /* QR — encodes ONLY the random ticket ID. Never personal data. */
+  new QRCode(qb, {
+    text: ticket.id, width: 132, height: 132,
+    colorDark: '#101418', colorLight: '#F4F5ED',
+    correctLevel: QRCode.CorrectLevel.M
+  });
+  // swap canvas -> <img> for reliable html2canvas capture (CE Night lesson)
+  setTimeout(function () {
+    const cv = qb.querySelector('canvas');
+    if (cv) { const img = new Image(); img.src = cv.toDataURL('image/png'); qb.innerHTML = ''; qb.appendChild(img); }
+  }, 60);
+}
+
+function renderState(kind, message) {
+  const wrap = $('scale-wrap');
+  const names = {
+    broken: 'Registration Not Linked', closed: 'Registration Closed',
+    full: 'Hearing Is Full', duplicate: 'Already Registered',
+    error: 'Something Went Wrong', loading: 'Contacting Registration Server…'
+  };
+  wrap.innerHTML = '';
+  const sc = el('div', 'state-card');
+  const tt = el('div', 'sc-title'); tt.textContent = names[kind] || kind;
+  tt.style.color = kind === 'loading' ? '#F4F5ED' : '#F0A79E';
+  const bd = el('div', 'sc-body'); bd.textContent = message;
+  sc.appendChild(tt); sc.appendChild(bd);
+  wrap.appendChild(sc);
+  $('btn-row').style.display = 'none';
+}
+
+/* ===================== REGISTRATION / TICKET FLOW ======================== */
+async function sha256Hex(text) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
+  return Array.from(new Uint8Array(buf)).map(function (b) { return b.toString(16).padStart(2, '0'); }).join('');
+}
+
+// Registration carries personal data — POST body, never a URL.
+// text/plain keeps it a CORS "simple request" (no preflight).
+function api(params) {
+  return fetch(APPS_SCRIPT_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify(params)
+  }).then(function (r) { return r.json(); });
+}
+
+async function boot() {
+  const p = new URLSearchParams(location.search);
+  const demo = p.get('demo') === '1';
+
+  // Scale card to screen width (900px design canvas).
+  function scale() {
+    const stage = $('stage');
+    const s = Math.min(1, (window.innerWidth - 24) / 900);
+    stage.style.transform = 'scale(' + s + ')';
+    $('scale-wrap').style.height = 560 * s + 'px';
+  }
+  window.addEventListener('resize', scale); scale();
+
+  if (APPS_SCRIPT_URL.indexOf('PASTE_') === 0 && !demo) {
+    return renderState('broken', 'This page has not been connected to the registration server yet. (APPS_SCRIPT_URL not set.)');
+  }
+
+  // Demo preview: ?demo=1&council=PSG ICE   (design checks only, no server)
+  if (demo) {
+    const council = p.get('council') || 'PSG ICE';
+    const theme = THEMES[council] || THEMES['PSG ICE'];
+    CURRENT = { ticket: { id: 'PREVIEW-X7KM-2QWV-AAAA', shortCode: 'PRV-VIEW', name: 'Juan D. Dela Cruz',
+      council: council, position: 'Council Representative', registeredAt: '—' }, theme: theme };
+    fillTicket(CURRENT.ticket, theme);
+    after(0.4).then(function () {
+      FX({ canvas: $('fx'), color: theme.accent, pattern: theme.fx, duration: 2.4 });
+    });
+    $('btn-row').querySelector('#agenda-btn').style.display = 'none';
+    $('btn-row').style.display = 'flex';
+    return;
+  }
+
+  const existingId = (p.get('t') || '').trim();
+  const name = (p.get('name') || '').trim();
+  const council = (p.get('council') || '').trim();
+  const position = (p.get('position') || '').trim();
+  const student = (p.get('student') || '').trim();
+  const ref = (p.get('ref') || '').trim();
+
+  try {
+    if (existingId) {
+      renderState('loading', '');
+      const res = await api({ action: 'ticket', id: existingId });
+      if (res.status !== 'ok') {
+        return renderState('broken', 'This ticket ID is not in the registry. If you just registered, reload once; otherwise register through the official link.');
+      }
+      finish(res.ticket);
+      return;
+    }
+
+    if (name && council && student) {
+      renderState('loading', '');
+      const t = Date.now();
+      const sig = await sha256Hex([name, council, student, t, REG_SALT].join('|'));
+      const res = await api({ action: 'register', name: name, council: council, position: position,
+        student: student, ref: ref, t: t, sig: sig, hp: '' });
+      if (res.status === 'ok') {
+        // Drop the personal data from the URL immediately: refresh must not
+        // re-register (and nobody should share a URL containing it).
+        history.replaceState(null, '', location.pathname + '?t=' + encodeURIComponent(res.ticket.id));
+        finish(res.ticket);
+        return;
+      }
+      if (res.status === 'duplicate') {
+        return renderState('duplicate', 'This student number already has a ticket. If this is you, return to the confirmation screen you received at registration; otherwise ask staff at the PSG-ICE registration table. For privacy, no ticket details are shown here.');
+      }
+      if (res.status === 'full') return renderState('full', 'All seats for this hearing have been claimed. Please contact your council representative about overflow accommodation.');
+      if (res.status === 'closed') return renderState('closed', 'Registration for this hearing is currently closed.');
+      return renderState('error', (res.message || 'Registration could not be completed.') + ' Please try again from the official form link, or ask the PSG-ICE registration desk.');
+    }
+
+    // Loud "broken link" state (CE Night lesson: failure must be obvious,
+    // never a quietly plausible-looking preview ticket).
+    renderState('broken', 'This ticket page was opened without a valid registration link. Do not screenshot or present this screen at check-in. Register through the official Tally form instead.');
+  } catch (e) {
+    console.error(e);
+    renderState('error', 'Could not reach the registration server. Check your connection and reload, or contact the PSG-ICE registration desk.');
+  }
+
+  function finish(ticket) {
+    const theme = THEMES[ticket.council] || THEMES['PSG Uniwide'];
+    CURRENT = { ticket: ticket, theme: theme };
+    // rebuild stage fresh (loading state cleared the stage wrapper)
+    const wrap = $('scale-wrap');
+    wrap.innerHTML = '';
+    const stage = el('div', 'stage'); stage.id = 'stage';
+    const cardEl = el('div'); cardEl.id = 'card';
+    const fx = el('canvas'); fx.className = 'fx-canvas'; fx.id = 'fx';
+    fx.width = 900; fx.height = 560;
+    stage.appendChild(cardEl); stage.appendChild(fx);
+    wrap.appendChild(stage);
+    window.addEventListener('resize', function () { scale(); });
+    function scale() {
+      const s = Math.min(1, (window.innerWidth - 24) / 900);
+      stage.style.transform = 'scale(' + s + ')';
+      wrap.style.height = 560 * s + 'px';
+    }
+    scale();
+
+    fillTicket(ticket, theme);
+    $('btn-row').style.display = 'flex';
+
+    // Decorative effect runs AFTER content is visible and exportable.
+    after(0.45).then(function () {
+      FX({ canvas: fx, color: theme.accent, pattern: theme.fx, duration: 2.4 });
+    });
+  }
+}
+
+/* ===================== EXPORT (html2canvas, filter-free) =================
+   CE Night lesson: CSS filter/backdrop-filter + html2canvas = black export.
+   So we capture an off-screen CLONE of #card with every filter removed and
+   literal gradient values baked in (they already are inline hexes here).
+   The FX canvas is a SIBLING of #card: it cannot appear in the clone, and
+   we additionally hide it during capture. Captured image = settled ticket.
+   =========================================================================*/
+document.getElementById('save-btn').addEventListener('click', async function () {
+  if (!CURRENT) return;
+  const btn = $('save-btn');
+  btn.disabled = true; btn.textContent = 'Saving…';
+  const fxCanvas = $('fx');
+  const prevFxDisplay = fxCanvas ? fxCanvas.style.display : '';
+  if (fxCanvas) fxCanvas.style.display = 'none';
+
+  const original = $('card');
+  const clone = original.cloneNode(true);
+  clone.removeAttribute('id');
+  clone.style.filter = 'none';
+  clone.style.transform = 'none';
+  clone.style.animation = 'none';
+  clone.style.position = 'fixed';
+  clone.style.left = '-10000px';
+  clone.style.top = '0';
+  clone.querySelectorAll('*').forEach(function (node) {
+    node.style.filter = 'none';
+    node.style.backdropFilter = 'none';
+    node.style.webkitBackdropFilter = 'none';
+    node.style.animation = 'none';
+  });
+  // Bake literal replacements for effects html2canvas cannot render.
+  const theme = CURRENT.theme;
+  const panel = clone.querySelector('.panel');
+  if (panel) panel.style.background =
+    'linear-gradient(160deg, ' + hexToRgba(theme.base, 0.88) + ' 0%, ' + hexToRgba(theme.deepest, 0.94) + ' 100%)';
+  document.body.appendChild(clone);
+
+  try {
+    if (document.fonts && document.fonts.ready) await document.fonts.ready;
+    const canvas = await html2canvas(clone, {
+      backgroundColor: theme.deepest, scale: 2, useCORS: true
+    });
+    const link = document.createElement('a');
+    link.download = 'hearing-ticket-' + CURRENT.ticket.shortCode + '.png';
+    link.href = canvas.toDataURL('image/png');
+    link.click();
+  } catch (e) {
+    console.error(e);
+    alert('Could not save the ticket image — please take a screenshot instead.');
+  } finally {
+    document.body.removeChild(clone);
+    if (fxCanvas) fxCanvas.style.display = prevFxDisplay;
+    btn.disabled = false; btn.textContent = 'Save Ticket as Image';
+  }
+});
+
+/* ========================= AGENDA (server-gated) ==========================
+   Agenda content NEVER ships inside this static file. It is fetched from
+   Apps Script, which serves it only if (a) the agenda switch is on and
+   (b) the requesting full ticket ID exists in the registry.
+   =========================================================================*/
+document.getElementById('agenda-btn').addEventListener('click', async function () {
+  if (!CURRENT) return;
+  const box = $('agenda-box');
+  box.style.display = 'block';
+  box.innerHTML = '<div style="font-family:\'IBM Plex Mono\',monospace;font-size:11px;letter-spacing:.12em;">Loading agenda…</div>';
+  try {
+    const res = await api({ action: 'agenda', id: CURRENT.ticket.id });
+    if (res.status === 'agenda_off') {
+      box.innerHTML = head() + '<div style="padding:14px 0;color:rgba(244,245,237,.6);font-size:13px;">' +
+        (res.message || 'The agenda publishes when the hearing opens.') + '</div>';
+      return;
+    }
+    if (res.status !== 'ok') {
+      box.innerHTML = head() + '<div style="padding:14px 0;color:rgba(244,245,237,.6);font-size:13px;">Agenda is available to registered attendees only.</div>';
+      return;
+    }
+    const table = document.createElement('table');
+    res.items.forEach(function (it) {
+      const tr = document.createElement('tr');
+      const tdT = document.createElement('td'); tdT.className = 't';
+      tdT.textContent = (it.start || '') + (it.end ? ' – ' + it.end : '');
+      const tdX = document.createElement('td');
+      const ttl = document.createElement('div'); ttl.textContent = it.title;
+      tdX.appendChild(ttl);
+      if (it.owner) { const ow = document.createElement('div'); ow.className = 'owner'; ow.textContent = it.owner; tdX.appendChild(ow); }
+      if (it.notes) { const nt = document.createElement('div'); nt.className = 'owner'; nt.textContent = it.notes; tdX.appendChild(nt); }
+      tr.appendChild(tdT); tr.appendChild(tdX);
+      table.appendChild(tr);
+    });
+    box.innerHTML = head() + '<div class="tz">All times ' + (res.tz || 'Asia/Manila (UTC+8)') + ' · live from the registry — subject to change</div>';
+    box.appendChild(table);
+  } catch (e) {
+    box.innerHTML = head() + '<div style="padding:14px 0;color:rgba(244,245,237,.6);font-size:13px;">Could not load the agenda right now. Try again shortly.</div>';
+  }
+  function head() {
+    return '<h3>Hearing Agenda</h3>';
+  }
+});
+
+document.addEventListener('DOMContentLoaded', boot);
+</script>
+</body>
+</html>

@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin Console — Student Council Public Hearing</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600&family=Oswald:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+
+/*
+ * PAULINIAN GREEN — shared system theme (ticket-design-spec.md).
+ * Functional admin UI, same visual system: forest-green base, frosted panels
+ * with cream hairline accents, serif-caps headers, condensed-caps status.
+ */
+  :root {
+    --sys-deepest: #0C2C1D;
+    --sys-base:    #11402A;
+    --sys-mid:     #1A6140;
+    --sys-glow:    #33C17F;
+    --sys-hi:      #5ED49D;
+    --cream:       #F4F5ED;
+    --gold:        #DBBE66;
+    --brick:       #8D3D34;
+    --ok-green:    #2E9E6A;
+    --amber:       #936E2F;
+    --serif: 'Playfair Display', serif;
+    --sans:  'Oswald', sans-serif;
+    --mono:  'IBM Plex Mono', monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; color: var(--cream); font-family: var(--sans); font-weight: 400;
+    background-color: var(--sys-deepest);
+    background-image:
+      radial-gradient(120% 80% at 50% 0%, rgba(51,193,127,0.14), rgba(12,44,29,0) 55%),
+      radial-gradient(ellipse 120% 100% at 50% 55%, rgba(0,0,0,0) 52%, rgba(5,18,12,0.55) 100%),
+      repeating-linear-gradient(115deg, rgba(244,245,237,0.02) 0 2px, transparent 2px 110px),
+      linear-gradient(168deg, var(--sys-base) 0%, var(--sys-deepest) 72%);
+    background-attachment: fixed;
+    min-height: 100vh;
+  }
+  .wrap { max-width: 900px; margin: 0 auto; padding: 26px 18px 60px; }
+  h1 {
+    font-family: var(--serif); font-weight: 600; font-size: 21px;
+    letter-spacing: 0.16em; text-transform: uppercase; margin: 0; color: var(--cream);
+  }
+  .sub {
+    font-family: var(--mono); font-size: 10px; letter-spacing: 0.2em;
+    text-transform: uppercase; color: var(--gold); margin: 6px 0 22px;
+  }
+  .card {
+    background: linear-gradient(160deg, rgba(26,97,64,0.4), rgba(12,44,29,0.58));
+    border: 1.5px solid rgba(244,245,237,0.28); border-radius: 16px;
+    box-shadow: 0 14px 34px rgba(0,0,0,0.4), inset 0 2px 0 rgba(244,245,237,0.3);
+    padding: 18px; margin-bottom: 16px;
+  }
+  .card h2 {
+    margin: 0 0 12px; font-family: var(--serif); font-weight: 600; font-size: 13px;
+    letter-spacing: 0.18em; text-transform: uppercase; color: var(--cream);
+  }
+  .switch-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 0; border-top: 1px dashed rgba(244,245,237,0.18); flex-wrap: wrap; }
+  .switch-row:first-of-type { border-top: none; }
+  .sw-label b { display: block; font-size: 14px; letter-spacing: 0.05em; font-weight: 600; text-transform: uppercase; }
+  .sw-label span { font-family: var(--mono); font-size: 10px; color: rgba(244,245,237,0.55); }
+  .state-pill {
+    font-family: var(--sans); font-weight: 600; font-size: 11px;
+    letter-spacing: 0.14em; text-transform: uppercase; padding: 5px 13px; border-radius: 20px;
+  }
+  .state-pill.on { background: rgba(46,158,106,0.32); color: var(--sys-hi); }
+  .state-pill.off { background: rgba(141,61,52,0.4); color: #F0A79E; }
+  .state-pill.sched { background: rgba(147,110,47,0.4); color: var(--gold); }
+  .btn {
+    background: var(--gold); border: none; color: var(--sys-deepest);
+    font-family: var(--sans); font-weight: 600; font-size: 12px;
+    letter-spacing: 0.1em; text-transform: uppercase;
+    padding: 9px 16px; border-radius: 8px; cursor: pointer;
+  }
+  .btn.danger { background: var(--brick); color: var(--cream); }
+  .btn.ghost { background: transparent; color: var(--cream); border: 1px solid rgba(244,245,237,0.4); }
+  input[type=text], input[type=number], input[type=password], input[type=datetime-local], select {
+    background: rgba(12,44,29,0.6); border: 1px solid rgba(244,245,237,0.3);
+    color: var(--cream); font-family: var(--mono); font-size: 12px; padding: 8px 10px; border-radius: 8px;
+  }
+  select option { color: #111; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  @media (max-width: 640px) { .grid2 { grid-template-columns: 1fr; } }
+  .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 8px; }
+  .note { font-family: var(--mono); font-size: 10.5px; color: rgba(244,245,237,0.55); line-height: 1.7; margin-top: 10px; }
+  #msg { font-family: var(--mono); font-size: 11.5px; color: var(--sys-hi); min-height: 18px; margin: 8px 0; }
+  table.data { width: 100%; border-collapse: collapse; font-size: 12px; }
+  table.data th {
+    font-family: var(--sans); font-weight: 600; font-size: 10px;
+    letter-spacing: 0.18em; text-transform: uppercase; color: var(--gold);
+    text-align: left; padding: 6px 8px; border-bottom: 1px solid rgba(219,190,102,0.45);
+  }
+  table.data td { padding: 6px 8px; border-bottom: 1px solid rgba(244,245,237,0.1); }
+  table.data td.mono { font-family: var(--mono); font-size: 11px; }
+  .scroll { max-height: 420px; overflow: auto; }
+  .counts {
+    display: flex; gap: 22px; flex-wrap: wrap;
+    font-family: var(--mono); font-size: 12px; letter-spacing: 0.05em;
+  }
+  .counts b { color: var(--gold); font-family: var(--sans); font-weight: 600; }
+  #login-card input { width: 100%; margin-bottom: 10px; }
+  #login-card .btn { width: 100%; }
+  .hidden { display: none !important; }
+
+  @media print {
+    body { background: #fff; color: #000; }
+    .no-print { display: none !important; }
+    .card { border: none; background: none; box-shadow: none; padding: 0; }
+    table.data th { color: #000; border-color: #000; }
+    table.data td { border-color: #999; }
+  }
+
+  </style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>Admin Console</h1>
+  <div class="sub">Student Council Public Hearing · control switches · export</div>
+
+  <div class="card" id="login-card">
+    <h2>Admin sign-in</h2>
+    <input type="password" id="pw" placeholder="Admin PIN (6+ letters &amp; digits, or VG backup PIN)" autocomplete="new-password" minlength="6">
+    <button class="btn" id="login-btn">Sign in</button>
+    <div id="msg"></div>
+    <div class="note">The admin credential is SEPARATE from the staff door PINs — the door staff cannot open this console or touch the kill switch. Every change here is logged with its actor and a Asia/Manila timestamp.</div>
+  </div>
+
+  <div id="console" class="hidden">
+
+    <div class="card no-print">
+      <h2>Live counts</h2>
+      <div class="counts">
+        <span>Registered: <b id="c-reg">–</b></span>
+        <span>Checked in: <b id="c-in">–</b></span>
+        <span>No-shows: <b id="c-out">–</b></span>
+        <span>Server time (PHT): <b id="c-time">–</b></span>
+      </div>
+    </div>
+
+    <div class="card no-print">
+      <h2>Control switches (enforced server-side on every request)</h2>
+
+      <div class="switch-row" data-key="registrationOpen">
+        <div class="sw-label"><b>Registration</b><span>Tally → ticket flow</span></div>
+        <div class="row"><span class="state-pill off" data-pill>—</span>
+          <button class="btn" data-flip>Toggle</button>
+          <select data-mode><option value="manual">manual</option><option value="auto">auto window</option></select>
+        </div>
+        <div class="row sched hidden" data-sched>
+          <input type="datetime-local" data-start> to <input type="datetime-local" data-end>
+          <button class="btn ghost" data-savesched>Set window</button>
+        </div>
+      </div>
+
+      <div class="switch-row" data-key="checkInOn">
+        <div class="sw-label"><b>Check-in (KILL SWITCH)</b><span>off = scanners show "Check-in closed"</span></div>
+        <div class="row"><span class="state-pill off" data-pill>—</span>
+          <button class="btn danger" data-flip>Toggle</button>
+          <select data-mode><option value="manual">manual</option><option value="auto">auto window</option></select>
+        </div>
+        <div class="row sched hidden" data-sched>
+          <input type="datetime-local" data-start> to <input type="datetime-local" data-end>
+          <button class="btn ghost" data-savesched>Set window</button>
+        </div>
+      </div>
+
+      <div class="switch-row" data-key="agendaOn">
+        <div class="sw-label"><b>Agenda visibility</b><span>served only to registered ticket IDs</span></div>
+        <div class="row"><span class="state-pill off" data-pill>—</span>
+          <button class="btn" data-flip>Toggle</button>
+          <select data-mode><option value="manual">manual</option><option value="auto">auto window</option></select>
+        </div>
+        <div class="row sched hidden" data-sched>
+          <input type="datetime-local" data-start> to <input type="datetime-local" data-end>
+          <button class="btn ghost" data-savesched>Set window</button>
+        </div>
+      </div>
+
+      <div class="switch-row">
+        <div class="sw-label"><b>Registration capacity</b><span>current cap on total seats</span></div>
+        <div class="row">
+          <input type="number" id="cap" min="0" max="5000" style="width:90px;">
+          <button class="btn ghost" id="cap-save">Save cap</button>
+        </div>
+      </div>
+      <div class="note">Manual mode always overrides the schedule ("manual override on top"). Toggle to manual + desired state at any time, even inside a scheduled window. Picklist times are interpreted as Asia/Manila.</div>
+    </div>
+
+    <div class="card no-print">
+      <h2>Staff lockouts</h2>
+      <div id="staff-box"></div>
+    </div>
+
+    <div class="card">
+      <h2>Export &amp; master list</h2>
+      <div class="row no-print">
+        <button class="btn" id="load-export">Load export data</button>
+        <button class="btn ghost hidden" id="csv-btn">Download CSV</button>
+        <button class="btn ghost hidden" id="print-btn">Print master list</button>
+      </div>
+      <div class="note no-print">Master list (name · council · position · code) is the offline fallback for the door. The CSV carries ticket IDs, check-in timestamps, scanning staff and no-show flags for handover.</div>
+      <div class="scroll" id="export-box"><p class="note">Not loaded yet.</p></div>
+    </div>
+
+    <div class="card no-print">
+      <h2>Recent log (latest 40)</h2>
+      <div class="scroll" id="log-box"><p class="note">Loaded with export data.</p></div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+const APPS_SCRIPT_URL = 'PASTE_APPS_SCRIPT_EXEC_URL_HERE';
+let PIN = sessionStorage.getItem('psg.admin') || '';
+
+// Admin calls carry the admin/backup PIN — POST body only, never a URL.
+// text/plain keeps it a CORS "simple request" (no preflight).
+function api(params) {
+  return fetch(APPS_SCRIPT_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify(params)
+  }).then(function (r) { return r.json(); });
+}
+function msg(t, bad) {
+  const m = document.getElementById('msg');
+  m.textContent = t || '';
+  m.style.color = bad ? '#ff9d9d' : '#9fe3bd';
+}
+
+/* ---------- login ---------- */
+async function login() {
+  try {
+    const d = await api({ action: 'admin', op: 'state', pin: PIN });
+    if (d.status === 'ok') {
+      sessionStorage.setItem('psg.admin', PIN);
+      document.getElementById('login-card').classList.add('hidden');
+      document.getElementById('console').classList.remove('hidden');
+      renderState(d);
+    } else if (d.status === 'locked') {
+      msg('Admin console locked after repeated wrong PINs. Wait ~20 minutes.', true);
+    } else {
+      msg('Wrong PIN. ' + (d.failsLeft != null ? d.failsLeft + ' attempt(s) left.' : ''), true);
+    }
+  } catch (e) { msg('Could not reach server.', true); }
+}
+document.getElementById('login-btn').addEventListener('click', function () {
+  PIN = document.getElementById('pw').value.trim();
+  if (PIN && PIN.length >= 6) login();
+  else msg('PINs are 6+ characters (letters & digits).', true);
+});
+document.getElementById('pw').addEventListener('keydown', function (e) { if (e.key === 'Enter') document.getElementById('login-btn').click(); });
+if (PIN) login();
+
+/* ---------- state rendering ---------- */
+let exportData = null;
+
+function renderState(d) {
+  document.getElementById('c-reg').textContent = d.registered + ' / cap ' + d.settings.regCapacity;
+  document.getElementById('c-in').textContent = d.checkedIn;
+  document.getElementById('c-out').textContent = d.noShows;
+  document.getElementById('c-time').textContent = d.serverTime;
+  document.getElementById('cap').value = d.settings.regCapacity;
+
+  document.querySelectorAll('.switch-row[data-key]').forEach(function (row) {
+    const key = row.getAttribute('data-key');
+    const eff = d.effective[key] === true;
+    const mode = d.settings[key + 'Mode'] || 'manual';
+    const pill = row.querySelector('[data-pill]');
+    pill.textContent = eff ? 'ON' : 'OFF';
+    pill.className = 'state-pill ' + (eff ? 'on' : 'off') + (mode === 'auto' ? ' sched' : '');
+    if (mode === 'auto') pill.textContent += ' · AUTO';
+    const modeSel = row.querySelector('[data-mode]');
+    modeSel.value = mode;
+    const sched = row.querySelector('[data-sched]');
+    sched.classList.toggle('hidden', mode !== 'auto');
+    sched.querySelector('[data-start]').value = d.settings[key + 'Start'] || '';
+    sched.querySelector('[data-end]').value = d.settings[key + 'End'] || '';
+  });
+
+  const sb = document.getElementById('staff-box');
+  sb.innerHTML = '';
+  d.staff.forEach(function (s) {
+    const row = document.createElement('div');
+    row.className = 'switch-row';
+    const left = document.createElement('div');
+    left.className = 'sw-label';
+    left.innerHTML = '<b></b><span></span>';
+    left.querySelector('b').textContent = s.name + ' (' + s.staffId + ')';
+    left.querySelector('span').textContent = s.lockedUntil ? 'LOCKED until ' + s.lockedUntil : (s.fails ? s.fails + ' failed attempt(s)' : 'no failures');
+    row.appendChild(left);
+    if (s.lockedUntil || s.fails > 0) {
+      const btn = document.createElement('button');
+      btn.className = 'btn ghost'; btn.textContent = 'Unlock / reset';
+      btn.addEventListener('click', function () { unlockStaff(s.staffId); });
+      row.appendChild(btn);
+    }
+    sb.appendChild(row);
+  });
+}
+
+async function refresh() {
+  try { renderState(await api({ action: 'admin', op: 'state', pin: PIN })); } catch (e) {}
+}
+
+/* ---------- switch actions ---------- */
+async function setKey(key, value) {
+  const d = await api({ action: 'admin', op: 'set', key: key, value: value, pin: PIN });
+  if (d.status !== 'ok') throw new Error(d.message || d.status);
+}
+
+document.querySelectorAll('.switch-row[data-key]').forEach(function (row) {
+  const key = row.getAttribute('data-key');
+  row.querySelector('[data-flip]').addEventListener('click', async function () {
+    try {
+      const cur = await api({ action: 'admin', op: 'state', pin: PIN });
+      const next = !(cur.effective[key] === true);
+      await setKey(key + 'Mode', 'manual');           // manual override on top
+      await setKey(key, next ? 'true' : 'false');
+      msg(key + ' -> ' + (next ? 'ON' : 'OFF') + ' (manual). Logged.');
+      refresh();
+    } catch (e) { msg('Failed: ' + e.message, true); }
+  });
+  row.querySelector('[data-mode]').addEventListener('change', async function (e) {
+    try {
+      await setKey(key + 'Mode', e.target.value);
+      msg(key + ' mode -> ' + e.target.value + '. Logged.');
+      refresh();
+    } catch (err) { msg('Failed: ' + err.message, true); }
+  });
+  row.querySelector('[data-savesched]').addEventListener('click', async function () {
+    const s = row.querySelector('[data-start]').value;
+    const en = row.querySelector('[data-end]').value;
+    try {
+      await setKey(key + 'Start', s || '');
+      await setKey(key + 'End', en || '');
+      msg(key + ' window set (' + (s || 'open start') + ' → ' + (en || 'no end') + '). Logged.');
+      refresh();
+    } catch (e2) { msg('Failed: ' + e2.message, true); }
+  });
+});
+
+document.getElementById('cap-save').addEventListener('click', async function () {
+  try {
+    await setKey('regCapacity', document.getElementById('cap').value);
+    msg('Capacity saved. Logged.');
+    refresh();
+  } catch (e) { msg('Failed: ' + e.message, true); }
+});
+
+async function unlockStaff(staffId) {
+  try {
+    const d = await api({ action: 'admin', op: 'unlock', staffId: staffId, pin: PIN });
+    if (d.status === 'ok') { msg(staffId + ' unlocked. Logged.'); refresh(); }
+    else msg('Failed: ' + (d.message || d.status), true);
+  } catch (e) { msg('Failed.', true); }
+}
+
+/* ---------- export / CSV / print ---------- */
+document.getElementById('load-export').addEventListener('click', async function () {
+  const box = document.getElementById('export-box');
+  box.innerHTML = '<p class="note">Loading…</p>';
+  try {
+    exportData = await api({ action: 'admin', op: 'export', pin: PIN });
+    if (exportData.status !== 'ok') { box.innerHTML = '<p class="note">Export failed.</p>'; return; }
+    renderExport();
+    document.getElementById('csv-btn').classList.remove('hidden');
+    document.getElementById('print-btn').classList.remove('hidden');
+  } catch (e) { box.innerHTML = '<p class="note">Export failed — connection.</p>'; }
+});
+
+function renderExport() {
+  const regs = exportData.registrants;
+  let html = '<p class="note">' + (regs.length) + ' registrants · generated ' + exportData.generatedAt + ' (' + exportData.tz + '). Columns: name · council · position · code · checked in · by whom.</p>';
+  html += '<table class="data"><thead><tr><th>#</th><th>Name</th><th>Council</th><th>Position</th><th>Code</th><th>Checked in</th><th>By</th></tr></thead><tbody>';
+  regs.forEach(function (r, i) {
+    html += '<tr><td>' + (i + 1) + '</td><td>' + esc(r.full_name) + '</td><td>' + esc(r.council) +
+      '</td><td>' + esc(r.position) + '</td><td class="mono">' + esc(r.short_code) + '</td><td class="mono">' +
+      (r.checked_in_at || '—') + '</td><td>' + esc(r.checked_in_by || '') + '</td></tr>';
+  });
+  html += '</tbody></table>';
+  document.getElementById('export-box').innerHTML = html;
+
+  const log = exportData.log || [];
+  let lh = '<table class="data"><thead><tr><th>Time (PHT)</th><th>Actor</th><th>Action</th><th>Detail</th></tr></thead><tbody>';
+  log.slice(-40).reverse().forEach(function (l) {
+    lh += '<tr><td class="mono">' + esc(l.ts) + '</td><td>' + esc(l.actor) + '</td><td class="mono">' + esc(l.action) + '</td><td>' + esc(l.detail) + '</td></tr>';
+  });
+  document.getElementById('log-box').innerHTML = lh + '</tbody></table>';
+}
+
+function esc(s) {
+  return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) {
+    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c];
+  });
+}
+
+document.getElementById('csv-btn').addEventListener('click', function () {
+  if (!exportData) return;
+  const cols = ['ticket_id', 'short_code', 'full_name', 'council', 'position', 'student_number',
+    'registered_at', 'checked_in_at', 'checked_in_by', 'no_show'];
+  let csv = cols.join(',') + '\n';
+  exportData.registrants.forEach(function (r) {
+    csv += cols.map(function (c) { return '"' + String(r[c] || '').replace(/"/g, '""') + '"'; }).join(',') + '\n';
+  });
+  csv += '\nscans_log_timestamp,ticket_id,result,staff\n';
+  (exportData.scans || []).forEach(function (s) {
+    csv += [s.ts, s.ticket_id, s.result, s.staff].map(function (v) { return '"' + String(v || '').replace(/"/g, '""') + '"'; }).join(',') + '\n';
+  });
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'hearing-export-' + exportData.generatedAt.replace(/[: ]/g, '-') + '.csv';
+  a.click();
+});
+
+document.getElementById('print-btn').addEventListener('click', function () { window.print(); });
+</script>
+</body>
+</html>

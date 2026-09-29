@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Check-In — Student Council Public Hearing</title>
+<!-- Adapted from CE Night (ICE-Socialization-Night/checkin.html):
+     html5-qrcode camera scanning, Apps Script JSON backend over POST
+     (credentials/PII never travel in URLs — GET is refused server-side),
+     full-screen green/amber/red result overlays, manual-entry fallback. -->
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,600;1,500&family=Oswald:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
+<style>
+
+/*
+ * PAULINIAN GREEN — shared system theme (ticket-design-spec.md).
+ * Logic structure unchanged from CE Night; visuals are the spec's forest-green
+ * system: deepest/base/mid/glow greens, vignette + faint light streaks,
+ * frosted panels with cream hairline accents, serif-caps headers,
+ * condensed-caps numbers/status, cream body text, gold functional accent.
+ * Per-department tokens apply ONLY inside the ticket card, never here.
+ */
+  :root {
+    --sys-deepest: #0C2C1D;
+    --sys-base:    #11402A;
+    --sys-mid:     #1A6140;
+    --sys-glow:    #33C17F;
+    --sys-hi:      #5ED49D;
+    --cream:       #F4F5ED;
+    --gold:        #DBBE66;
+    --serif: 'Playfair Display', serif;
+    --sans:  'Oswald', sans-serif;
+    --mono:  'IBM Plex Mono', monospace;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; color: var(--cream); font-family: var(--sans); font-weight: 400; }
+  body {
+    background-color: var(--sys-deepest);
+    background-image:
+      radial-gradient(120% 80% at 50% 0%, rgba(51,193,127,0.16), rgba(12,44,29,0) 55%),
+      radial-gradient(ellipse 120% 100% at 50% 55%, rgba(0,0,0,0) 52%, rgba(5,18,12,0.6) 100%),
+      repeating-linear-gradient(115deg, rgba(244,245,237,0.024) 0 2px, transparent 2px 110px),
+      linear-gradient(168deg, var(--sys-base) 0%, var(--sys-deepest) 72%);
+    background-attachment: fixed;
+  }
+  #app { display: none; flex-direction: column; height: 100vh; }
+  #app.on { display: flex; }
+
+  header { text-align: center; padding: 14px 12px 8px; flex-shrink: 0; }
+  header .eyebrow {
+    font-family: var(--mono); font-size: 10px; letter-spacing: 0.26em;
+    text-transform: uppercase; color: var(--gold);
+  }
+  header h1 {
+    font-family: var(--serif); font-weight: 600; font-size: 20px; margin: 5px 0 0;
+    letter-spacing: 0.1em; text-transform: uppercase; color: var(--cream);
+  }
+  .staff-tag {
+    font-family: var(--mono); font-size: 10px; color: rgba(244,245,237,0.6);
+    margin-top: 5px; letter-spacing: 0.08em;
+  }
+  .staff-tag b { color: var(--sys-hi); }
+
+  #scanner-wrap { flex: 1; position: relative; display: flex; align-items: center; justify-content: center; min-height: 0; }
+  #reader { width: min(92vw, 420px); min-height: 240px; }
+  #reader video {
+    border-radius: 14px; width: 100% !important; height: auto !important;
+    border: 2px solid rgba(244,245,237,0.35);
+    box-shadow: 0 12px 34px rgba(0,0,0,0.45), 0 0 0 1px rgba(51,193,127,0.15);
+  }
+  .scan-hint {
+    position: absolute; bottom: 14px; left: 0; right: 0; text-align: center;
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.12em;
+    text-transform: uppercase; color: rgba(244,245,237,0.55);
+  }
+  .scan-error {
+    display: none; margin: 12px auto 0; max-width: 90vw; padding: 12px 16px;
+    border: 1px solid #8D3D34; background: rgba(112,48,41,0.3); border-radius: 10px;
+    font-family: var(--mono); font-size: 12px; line-height: 1.6; color: var(--cream);
+  }
+  .scan-error.show { display: block; }
+
+  .row-btns { flex-shrink: 0; display: flex; justify-content: center; gap: 14px; }
+  .toggle-btn {
+    background: none; border: none; color: rgba(244,245,237,0.5);
+    font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.06em;
+    text-decoration: underline; cursor: pointer; padding: 8px 10px;
+  }
+  .toggle-btn:hover { color: var(--gold); }
+
+  .manual-entry { flex-shrink: 0; display: none; gap: 8px; padding: 4px 16px 8px; align-items: center; }
+  .manual-entry input {
+    flex: 1; background: rgba(12,44,29,0.55); border: 1px solid rgba(219,190,102,0.4);
+    color: var(--cream); font-family: var(--mono); font-size: 13px; padding: 10px 12px; border-radius: 8px;
+  }
+  .manual-entry input::placeholder { color: rgba(244,245,237,0.35); }
+  .manual-entry button {
+    background: var(--gold); color: var(--sys-deepest); border: none; font-family: var(--mono);
+    font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; font-weight: 700;
+    padding: 10px 16px; border-radius: 8px; cursor: pointer; flex-shrink: 0;
+  }
+
+  #stats {
+    flex-shrink: 0; display: flex; justify-content: center; gap: 18px; flex-wrap: wrap;
+    padding: 10px 12px calc(14px + env(safe-area-inset-bottom));
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.06em;
+    color: rgba(244,245,237,0.65); border-top: 1px solid rgba(244,245,237,0.14);
+  }
+  #stats b { color: var(--gold); font-family: var(--sans); font-weight: 600; letter-spacing: 0.04em; }
+
+  /* ------- PIN gate (frosted panel, cream hairline motif) ------- */
+  #gate { height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; }
+  #gate.off { display: none; }
+  .gate-card {
+    width: min(92vw, 380px); padding: 30px 26px; text-align: center;
+    background: linear-gradient(160deg, rgba(26,97,64,0.42), rgba(12,44,29,0.62));
+    border: 1.5px solid rgba(244,245,237,0.35); border-radius: 16px;
+    box-shadow: 0 18px 44px rgba(0,0,0,0.5), inset 0 2px 0 rgba(244,245,237,0.4);
+  }
+  .gate-card h2 {
+    margin: 0 0 4px; font-family: var(--serif); font-weight: 600;
+    font-size: 20px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--cream);
+  }
+  .gate-card .sub {
+    font-family: var(--mono); font-size: 9.5px; letter-spacing: 0.18em;
+    text-transform: uppercase; color: var(--gold); margin-bottom: 22px;
+  }
+  .gate-card select, .gate-card input {
+    width: 100%; margin-bottom: 12px; background: rgba(12,44,29,0.6);
+    border: 1px solid rgba(244,245,237,0.3); color: var(--cream);
+    font-family: var(--mono); font-size: 14px; padding: 12px; border-radius: 8px;
+  }
+  .gate-card select option { color: #111; }
+  .gate-card button {
+    width: 100%; background: var(--gold); color: var(--sys-deepest); border: none;
+    cursor: pointer; font-family: var(--sans); font-size: 13px; font-weight: 600;
+    letter-spacing: 0.14em; text-transform: uppercase; padding: 13px; border-radius: 8px;
+  }
+  .gate-msg { font-family: var(--mono); font-size: 11px; color: #F0A79E; min-height: 16px; margin-top: 10px; line-height: 1.5; }
+
+  /* ------- full-screen results: palette-harmonized, restrained ------- */
+  #result {
+    position: fixed; inset: 0; display: none; flex-direction: column;
+    align-items: center; justify-content: center; text-align: center;
+    padding: 32px 24px; z-index: 10; color: var(--cream);
+  }
+  #result.show { display: flex; }
+  /* Paulinian success green, not a generic bootstrap green */
+  #result.valid {
+    background:
+      radial-gradient(ellipse 120% 70% at 50% 30%, rgba(94,212,157,0.28), rgba(0,0,0,0) 60%),
+      linear-gradient(155deg, #1F6B47 0%, #2E9E6A 100%);
+  }
+  /* restrained brick red */
+  #result.not_found, #result.invalid, #result.error {
+    background:
+      radial-gradient(ellipse 120% 70% at 50% 30%, rgba(244,245,237,0.08), rgba(0,0,0,0) 60%),
+      linear-gradient(155deg, #703029 0%, #8D3D34 100%);
+  }
+  /* restrained antique amber */
+  #result.duplicate {
+    background:
+      radial-gradient(ellipse 120% 70% at 50% 30%, rgba(244,245,237,0.09), rgba(0,0,0,0) 60%),
+      linear-gradient(155deg, #745725 0%, #936E2F 100%);
+  }
+  #result .icon { font-size: 64px; line-height: 1; margin-bottom: 10px; }
+  #result .status-label {
+    font-family: var(--sans); font-weight: 600; font-size: 16px;
+    letter-spacing: 0.2em; text-transform: uppercase; margin-bottom: 16px;
+  }
+  #result .guest-name {
+    font-family: var(--serif); font-weight: 600; font-size: 30px; margin: 0 0 8px;
+    letter-spacing: 0.04em; text-transform: uppercase;
+  }
+  #result .guest-detail { font-family: var(--mono); font-size: 13.5px; letter-spacing: 0.05em; opacity: 0.95; margin: 3px 0; }
+  #result .dismiss-note { margin-top: 26px; font-family: var(--mono); font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; opacity: 0.78; }
+
+  /* ------- kill-switch closed screen (deep green + gold) ------- */
+  #closed {
+    position: fixed; inset: 0; display: none; flex-direction: column;
+    align-items: center; justify-content: center; text-align: center;
+    background:
+      radial-gradient(ellipse 120% 80% at 50% 0%, rgba(51,193,127,0.12), rgba(0,0,0,0) 60%),
+      linear-gradient(165deg, #0E3A26 0%, var(--sys-deepest) 100%);
+    background-color: var(--sys-deepest);
+    z-index: 9; padding: 30px 24px;
+  }
+  #closed.show { display: flex; }
+  #closed .big {
+    font-family: var(--sans); font-weight: 600; font-size: 19px;
+    letter-spacing: 0.24em; text-transform: uppercase;
+    color: var(--gold); margin-bottom: 14px;
+    padding-bottom: 10px; border-bottom: 2px solid var(--cream);
+  }
+  #closed .small { font-family: var(--mono); font-size: 12px; color: rgba(244,245,237,0.65); line-height: 1.8; max-width: 420px; }
+
+  /* ------- manual lookup ------- */
+  #lookup-results { display: none; width: 100%; max-height: 30vh; overflow-y: auto; padding: 0 16px 8px; }
+  .lookup-item {
+    display: flex; justify-content: space-between; align-items: center; gap: 10px;
+    background: linear-gradient(160deg, rgba(26,97,64,0.45), rgba(12,44,29,0.6));
+    border: 1px solid rgba(244,245,237,0.25); border-radius: 10px;
+    padding: 10px 12px; margin-bottom: 8px; cursor: pointer;
+  }
+  .lookup-item .who { font-size: 14px; font-weight: 500; letter-spacing: 0.03em; }
+  .lookup-item .meta { font-family: var(--mono); font-size: 10px; color: rgba(244,245,237,0.6); letter-spacing: 0.04em; }
+  .lookup-item .badge {
+    font-family: var(--sans); font-weight: 600; font-size: 10px;
+    letter-spacing: 0.1em; text-transform: uppercase;
+    padding: 4px 10px; border-radius: 12px; background: rgba(46,158,106,0.4);
+  }
+  .lookup-item .badge.pending { background: rgba(219,190,102,0.3); color: var(--gold); }
+
+  </style>
+</head>
+<body>
+
+<!-- ---------- PIN gate ---------- -->
+<div id="gate">
+  <div class="gate-card">
+    <h2>Hearing Check-In</h2>
+    <div class="sub">Staff access only · PSG-ICE door system</div>
+    <select id="g-staff">
+      <option value="staff1">Staff A (Uniwide)</option>
+      <option value="staff2">Staff B (Uniwide)</option>
+      <option value="staff3">Staff C (Uniwide)</option>
+    </select>
+    <input type="password" id="g-pin" autocomplete="new-password" minlength="6" placeholder="Staff PIN (6+ letters &amp; digits)">
+    <button id="g-go">Start Shift</button>
+    <div class="gate-msg" id="g-msg"></div>
+  </div>
+</div>
+
+<!-- ---------- scanner app ---------- -->
+<div id="app">
+  <header>
+    <div class="eyebrow">PSG · Door Check-In</div>
+    <h1>Student Council Public Hearing</h1>
+    <div class="staff-tag">Logged in as <b id="staff-name">—</b> · every scan is tagged to you</div>
+  </header>
+
+  <div id="scanner-wrap">
+    <div id="reader"></div>
+    <div class="scan-hint" id="scan-hint">Point camera at the attendee's ticket QR</div>
+  </div>
+
+  <div class="scan-error" id="scan-error"></div>
+
+  <div class="row-btns">
+    <button class="toggle-btn" id="manual-toggle">Trouble scanning? Name / code lookup</button>
+    <button class="toggle-btn" id="logout-btn">End shift</button>
+  </div>
+
+  <div class="manual-entry" id="manual-entry">
+    <input type="text" id="manual-q" placeholder="Type name or lookup code (e.g. ICE-K7M2)…" autocomplete="off">
+    <button id="manual-submit">Find</button>
+  </div>
+  <div id="lookup-results"></div>
+
+  <div id="stats">
+    <span>Registered: <b id="stat-reg">–</b></span>
+    <span>Checked in: <b id="stat-in">–</b></span>
+    <span>No-shows: <b id="stat-out">–</b></span>
+    <span>This device — OK: <b id="stat-valid">0</b> Dup: <b id="stat-dup">0</b> Fail: <b id="stat-bad">0</b></span>
+  </div>
+</div>
+
+<!-- ---------- result overlay ---------- -->
+<div id="result">
+  <div class="icon" id="r-icon">—</div>
+  <div class="status-label" id="r-status">—</div>
+  <div class="guest-name" id="r-name">—</div>
+  <div class="guest-detail" id="r-council">—</div>
+  <div class="guest-detail" id="r-position"></div>
+  <div class="guest-detail" id="r-extra"></div>
+  <div class="dismiss-note">Tap anywhere to scan next attendee</div>
+</div>
+
+<!-- ---------- kill-switch closed screen ---------- -->
+<div id="closed">
+  <div class="big">Check-In Closed</div>
+  <div class="small">Check-in has been switched off by the admin console.<br>
+  The scanner will resume automatically when it is switched back on.<br><br>
+  Do NOT check anyone in manually on paper unless admin instructs it.</div>
+</div>
+
+<script>
+const APPS_SCRIPT_URL = 'PASTE_APPS_SCRIPT_EXEC_URL_HERE';
+
+let staffId = null, staffPin = null, staffName = null;
+const localStats = { valid: 0, dup: 0, bad: 0 };
+let busy = false, headcountTimer = null, closedShown = false;
+
+// All scanner calls carry the staff PIN — POST body, never a URL, so it
+// cannot leak via history/autocomplete/screen recordings/shared links.
+// text/plain keeps it a CORS "simple request" (no preflight).
+function api(params) {
+  return fetch(APPS_SCRIPT_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify(params)
+  }).then(function (r) { return r.json(); });
+}
+function withAuth(extra) {
+  return Object.assign({ staffId: staffId, pin: staffPin }, extra || {});
+}
+
+/* ---------- PIN gate ---------- */
+document.getElementById('g-go').addEventListener('click', startShift);
+document.getElementById('g-pin').addEventListener('keydown', function (e) { if (e.key === 'Enter') startShift(); });
+
+async function startShift() {
+  staffId = document.getElementById('g-staff').value;
+  staffPin = document.getElementById('g-pin').value.trim();
+  const msg = document.getElementById('g-msg');
+  msg.textContent = '';
+  if (!staffPin) { msg.textContent = 'Enter your PIN.'; return; }
+  if (staffPin.length < 6) { msg.textContent = 'PINs are 6+ characters (letters & digits).'; return; }
+  if (APPS_SCRIPT_URL.indexOf('PASTE_') === 0) { msg.textContent = 'Scanner not configured (APPS_SCRIPT_URL missing).'; return; }
+  try {
+    const res = await api({ action: 'auth', staffId: staffId, pin: staffPin });
+    if (res.status === 'ok') {
+      staffName = res.name;
+      sessionStorage.setItem('psg.staff', JSON.stringify({ staffId: staffId, pin: staffPin, name: staffName }));
+      enterApp();
+    } else if (res.status === 'locked') {
+      msg.textContent = 'This staff account is locked (too many wrong PINs) until ' + (res.until || 'later') + '. Ask an admin to unlock.';
+    } else if (res.status === 'bad_pin') {
+      msg.textContent = 'Wrong PIN. ' + (res.failsLeft != null ? res.failsLeft + ' attempt(s) left before lockout.' : '');
+    } else {
+      msg.textContent = 'Access denied (' + res.status + ').';
+    }
+  } catch (e) { msg.textContent = 'Could not reach the server — check connection.'; }
+}
+
+function enterApp() {
+  document.getElementById('gate').classList.add('off');
+  document.getElementById('app').classList.add('on');
+  document.getElementById('staff-name').textContent = staffName;
+  initCamera();
+  refreshHeadcount();
+  headcountTimer = setInterval(refreshHeadcount, 12000);
+}
+
+// Resume a shift on page refresh (staff device stays with the staff member).
+(function resume() {
+  try {
+    const saved = JSON.parse(sessionStorage.getItem('psg.staff') || 'null');
+    if (saved && saved.staffId && saved.pin) {
+      staffId = saved.staffId; staffPin = saved.pin; staffName = saved.name;
+      enterApp();
+    }
+  } catch (e) {}
+})();
+
+document.getElementById('logout-btn').addEventListener('click', function () {
+  sessionStorage.removeItem('psg.staff');
+  location.reload();
+});
+
+/* ---------- check-in flow ---------- */
+async function runCheckIn(ticketId) {
+  if (!ticketId || busy) return;
+  busy = true;
+  try {
+    const data = await api(withAuth({ action: 'checkin', ticket: ticketId }));
+    if (data.status === 'locked' || data.status === 'bad_pin' || data.status === 'unknown_staff') {
+      sessionStorage.removeItem('psg.staff');
+      alert('Your staff session was rejected (' + data.status + '). Please sign in again.');
+      location.reload();
+      return;
+    }
+    if (data.status === 'closed') { showClosed(); busy = false; return; }
+    showResult(data.status, data);
+  } catch (e) {
+    showResult('error', { message: 'Could not reach the verification server.' });
+  }
+  scheduleAutoDismiss();
+}
+
+function showResult(status, data) {
+  const el = document.getElementById('result');
+  el.className = 'show ' + status;
+  const icons = { valid: '✓', duplicate: '⟳', not_found: '✕', error: '!' };
+  const labels = {
+    valid: 'Registered — Welcome In',
+    duplicate: 'Already Checked In',
+    not_found: 'Not in Registry — Do Not Admit',
+    error: 'System Error — Check Manually'
+  };
+  document.getElementById('r-icon').textContent = icons[status] || '?';
+  document.getElementById('r-status').textContent = labels[status] || status;
+  const a = data.attendee || {};
+  document.getElementById('r-name').textContent = a.name || (status === 'not_found' ? 'Unknown ticket' : '—');
+  document.getElementById('r-council').textContent = a.council || data.message || '';
+  document.getElementById('r-position').textContent = a.position || '';
+  document.getElementById('r-extra').textContent =
+    status === 'duplicate'
+      ? 'Checked in at ' + (data.checkedInAt || '?') + ' by ' + (data.checkedInBy || '?')
+      : (a.shortCode ? 'Code ' + a.shortCode + ' · ' + (data.checkedInAt || '') : (data.message || ''));
+
+  if (status === 'valid') localStats.valid++;
+  else if (status === 'duplicate') localStats.dup++;
+  else localStats.bad++;
+  document.getElementById('stat-valid').textContent = localStats.valid;
+  document.getElementById('stat-dup').textContent = localStats.dup;
+  document.getElementById('stat-bad').textContent = localStats.bad;
+
+  if (navigator.vibrate) navigator.vibrate(status === 'valid' ? 80 : [60, 60, 60]);
+  refreshHeadcount();
+}
+
+let dismissGen = 0;
+function scheduleAutoDismiss() {
+  const gen = ++dismissGen;
+  setTimeout(function () {
+    if (gen !== dismissGen) return;
+    document.getElementById('result').classList.remove('show');
+    busy = false;
+  }, 4500);
+}
+document.getElementById('result').addEventListener('click', function () {
+  dismissGen++;
+  document.getElementById('result').classList.remove('show');
+  busy = false;
+});
+
+/* ---------- kill-switch screen ---------- */
+function showClosed() {
+  closedShown = true;
+  document.getElementById('closed').classList.add('show');
+  document.getElementById('result').classList.remove('show');
+}
+function hideClosed() {
+  closedShown = false;
+  document.getElementById('closed').classList.remove('show');
+}
+
+/* ---------- live headcount + kill-switch polling ---------- */
+async function refreshHeadcount() {
+  try {
+    const d = await api(withAuth({ action: 'stats' }));
+    if (d.status !== 'ok') return;
+    document.getElementById('stat-reg').textContent = d.registered + ' / cap ' + d.capacity;
+    document.getElementById('stat-in').textContent = d.checkedIn;
+    document.getElementById('stat-out').textContent = d.noShows;
+    if (d.settings && d.settings.checkInOn === false) showClosed();
+    else if (closedShown) hideClosed();
+  } catch (e) { /* transient */ }
+}
+
+/* ---------- camera (CE Night init pattern, with hard error surfacing) ---------- */
+const html5QrCode = typeof Html5Qrcode !== 'undefined' ? new Html5Qrcode('reader') : null;
+
+function onScanSuccess(decodedText) {
+  if (busy || closedShown) return;
+  runCheckIn(String(decodedText).trim());
+}
+
+function showCameraError(message) {
+  const el = document.getElementById('scan-error');
+  el.textContent = message;
+  el.classList.add('show');
+  document.getElementById('scan-hint').textContent = 'Camera unavailable — use name / code lookup below.';
+}
+
+async function initCamera() {
+  if (!html5QrCode) return showCameraError('Scanner library failed to load. Reload the page, or use lookup below.');
+  if (!window.isSecureContext || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    return showCameraError('No camera access in this context (' + location.protocol + '). Open the https page directly in Chrome/Safari, not inside another app\'s browser.');
+  }
+  let cameras = [];
+  try { cameras = await Html5Qrcode.getCameras(); } catch (err) {
+    return showCameraError('Could not list cameras (' + (err && err.message || err) + '). Use lookup below.');
+  }
+  if (!cameras.length) return showCameraError('No camera detected. Use lookup below.');
+  const qrbox = function (w, h) { const e = Math.min(w, h) * 0.72; return { width: e, height: e }; };
+  try {
+    await html5QrCode.start({ facingMode: 'environment' }, { fps: 10, qrbox: qrbox }, onScanSuccess, function () {});
+  } catch (err) {
+    try {
+      await html5QrCode.start(cameras[0].id, { fps: 10, qrbox: qrbox }, onScanSuccess, function () {});
+    } catch (err2) {
+      showCameraError('Could not start camera (' + (err2 && err2.message || err2) + '). Use lookup below or reload.');
+    }
+  }
+}
+
+/* ---------- manual lookup: name or short code ---------- */
+document.getElementById('manual-toggle').addEventListener('click', function () {
+  const box = document.getElementById('manual-entry');
+  const show = box.style.display !== 'flex';
+  box.style.display = show ? 'flex' : 'none';
+  document.getElementById('lookup-results').style.display = 'none';
+  if (show) document.getElementById('manual-q').focus();
+});
+
+async function doLookup() {
+  const q = document.getElementById('manual-q').value.trim();
+  if (q.length < 3 || busy) return;
+  const list = document.getElementById('lookup-results');
+  list.style.display = 'block';
+  list.innerHTML = '<div style="font-family:var(--mono);font-size:11px;color:rgba(244,245,237,.5);padding:6px 2px;">Searching…</div>';
+  try {
+    const d = await api(withAuth({ action: 'lookup', q: q }));
+    if (d.status !== 'ok') { list.innerHTML = '<div style="font-family:var(--mono);font-size:11px;padding:6px 2px;">' + (d.message || d.status) + '</div>'; return; }
+    if (!d.matches.length) { list.innerHTML = '<div style="font-family:var(--mono);font-size:11px;padding:6px 2px;">No match — check spelling, or the attendee may not be registered.</div>'; return; }
+    list.innerHTML = '';
+    d.matches.forEach(function (m) {
+      const item = document.createElement('div');
+      item.className = 'lookup-item';
+      const left = document.createElement('div');
+      const who = document.createElement('div'); who.className = 'who'; who.textContent = m.name;
+      const meta = document.createElement('div'); meta.className = 'meta';
+      meta.textContent = m.council + ' · ' + m.position + ' · ' + m.shortCode;
+      left.appendChild(who); left.appendChild(meta);
+      const badge = document.createElement('span');
+      badge.className = 'badge' + (m.checkedIn ? '' : ' pending');
+      badge.textContent = m.checkedIn ? 'IN' : 'CHECK IN';
+      item.appendChild(left); item.appendChild(badge);
+      item.addEventListener('click', function () {
+        if (busy) return;
+        list.style.display = 'none';
+        runCheckIn(m.id);
+      });
+      list.appendChild(item);
+    });
+  } catch (e) {
+    list.innerHTML = '<div style="font-family:var(--mono);font-size:11px;padding:6px 2px;">Lookup failed — check connection.</div>';
+  }
+}
+document.getElementById('manual-submit').addEventListener('click', doLookup);
+document.getElementById('manual-q').addEventListener('keydown', function (e) { if (e.key === 'Enter') doLookup(); });
+</script>
+</body>
+</html>
