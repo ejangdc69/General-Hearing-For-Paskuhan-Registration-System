@@ -243,7 +243,7 @@ async function login() {
       document.getElementById('console').classList.remove('hidden');
       renderState(d);
     } else if (d.status === 'locked') {
-      msg('Admin console locked after repeated wrong PINs. Wait ~20 minutes.', true);
+      msg('Admin console locked after repeated wrong PINs. Wait ~20 minutes.', false);
     } else {
       msg('Wrong PIN. ' + (d.failsLeft != null ? d.failsLeft + ' attempt(s) left.' : ''), true);
     }
