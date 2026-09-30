@@ -254,7 +254,7 @@
 </head>
 <body>
 
-<div class="page-eyebrow">SPUP · Joint Student Council · General Meeting for Paskuhan 2026</div>
+<div class="page-eyebrow">SPUP · Joint Student Council · General Hearing for Paskuhan</div>
 
 <div class="scale-wrap" id="scale-wrap">
   <div class="stage" id="stage">
@@ -285,10 +285,10 @@ const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyqBLqb3GVID6di
 const REG_SALT        = '651313a5db7445e99d9e9084ee170e10';
 
 const EVENT = {
-  eyebrow: 'Joint Student Council · General Meeting · SY 2026–2027',
-  ribbonTitle: 'General Meeting',
-  motto: 'In the name of priceless service.',
-  footerMeta: 'SPUP · Paskuhan Guidelines Reading & Finalization · DATE TO BE ANNOUNCED!',
+  eyebrow: 'Joint Student Council · General Hearing · SY 2026–2027',
+  ribbonTitle: 'General Hearing',
+  motto: 'Order through dialogue, unity through voice.',
+  footerMeta: 'SPUP · Paskuhan · Doors 8:00 AM',
 };
 
 /* Credit line: discreet, clear of ribbon/panel artwork. Position is
@@ -770,20 +770,17 @@ document.getElementById('save-btn').addEventListener('click', async function () 
       const qrLiveImg = original.querySelector('.qr-box img');
       const boxRect = clone.querySelector('.qr-box').getBoundingClientRect();
       const k = canvas.width / 900;
-      console.log('QR-OVERDRAW: qrLiveImg=', !!qrLiveImg, 'natural=', qrLiveImg && qrLiveImg.naturalWidth,
-                  'boxL=', boxRect && boxRect.left, 'boxT=', boxRect && boxRect.top, 'k=', k);
       if (qrLiveImg && qrLiveImg.src) {
         if (qrLiveImg.decode) { try { await qrLiveImg.decode(); } catch (e) {} }
+        // html2canvas leaves scale/translate on the context — reset before
+        // stamping the QR or the modules land off-canvas (blank-box bug).
         const octx = canvas.getContext('2d');
-        octx.setTransform(1, 0, 0, 1, 0, 0);  // h2c leaves scale/translate residue
+        octx.setTransform(1, 0, 0, 1, 0, 0);
         octx.drawImage(qrLiveImg,
           (boxRect.left + 10000 + 8) * k, (boxRect.top + 8) * k,
           132 * k, 132 * k);
-        const cx = Math.round((boxRect.left + 10000 + 8 + 20) * k), cy = Math.round((boxRect.top + 8 + 20) * k);
-        console.log('QR-OVERDRAW: painted at', (boxRect.left + 10000 + 8) * k, (boxRect.top + 8) * k,
-                    'sample pixel=', JSON.stringify(canvas.getContext('2d').getImageData(cx, cy, 1, 1).data));
       }
-    } catch (qrErr) { console.log('QR-OVERDRAW ERR:', String(qrErr)); }
+    } catch (qrErr) { /* box stays; never fail the export on the overlay */ }
     const link = document.createElement('a');
     link.download = 'hearing-ticket-' + CURRENT.ticket.shortCode + '.png';
     link.href = canvas.toDataURL('image/png');
@@ -844,5 +841,5 @@ document.getElementById('agenda-btn').addEventListener('click', async function (
 
 document.addEventListener('DOMContentLoaded', boot);
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a43349e74afe643b',t:'MTc5MDc3MTk0OA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a434bca70d677d2e',t:'MTc5MDc4NzEzNA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
