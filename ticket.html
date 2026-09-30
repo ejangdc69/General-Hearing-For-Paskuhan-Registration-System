@@ -651,9 +651,17 @@ async function boot() {
 
     if (name && council && student) {
       renderState('loading', '');
+      // Sign + post the canonical form the server will store: its sanitize()
+      // strips <>"'` and collapses whitespace BEFORE verifying the signature,
+      // so apostrophes/quotes in names (O'Brien) must be transformed here too
+      // or the hashes diverge and registration rejects (spam:badsig).
+      const canon = function (v, max) {
+        return String(v || '').replace(/[<>"'`]/g, '').replace(/\s+/g, ' ').trim().slice(0, max || 100);
+      };
+      const cName = canon(name, 80), cCouncil = canon(council, 40), cPosition = canon(position, 80);
       const t = Date.now();
-      const sig = await sha256Hex([name, council, student, t, REG_SALT].join('|'));
-      const res = await api({ action: 'register', name: name, council: council, position: position,
+      const sig = await sha256Hex([cName, cCouncil, student, t, REG_SALT].join('|'));
+      const res = await api({ action: 'register', name: cName, council: cCouncil, position: cPosition,
         student: student, ref: ref, t: t, sig: sig, hp: '' });
       if (res.status === 'ok') {
         // Drop the personal data from the URL immediately: refresh must not
@@ -841,5 +849,5 @@ document.getElementById('agenda-btn').addEventListener('click', async function (
 
 document.addEventListener('DOMContentLoaded', boot);
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a434bca70d677d2e',t:'MTc5MDc4NzEzNA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</body>
 </html>
