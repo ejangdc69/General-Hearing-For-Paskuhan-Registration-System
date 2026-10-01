@@ -437,45 +437,102 @@ function sortRegistrants(regs) {
 }
 
 /* ================ MASTER WORKBOOK (per-council tabs, XLSX) ================
-   One click → one .xlsx: Headcount tab (per-council registered / checked-in /
-   no-show accounting for post-event reconciliation) + one tab per council
-   (sorted by the officer ladder, names A-Z within rung) + Scan Log audit tab.
+   One click → one .xlsx:
+     • Headcount tab — per-council Registered / Checked In / No-Show / Absent +
+       Attendance % (traffic-light fills) for post-event accounting
+     • One tab per council — ticket-palette color identity, officer-ladder sort,
+       tri-state row styling (checked in = green tint, no-show = red text)
+     • Scan Log audit tab
+   Every tab: banner + frozen filterable headers + A4 landscape print setup
+   (header rows repeat on every printed page, page-numbered footer).
    Pure-function core (buildMasterWorkbook) is unit-testable outside the
    browser; DOM only touches it at the click seam. */
 const NO_SHOW_WORDS = ['TRUE', 'true', 'yes', 'Yes', '1'];
 function isNoShow(v) { return v === true || NO_SHOW_WORDS.indexOf(String(v)) !== -1; }
+
+/* Council identity — pulled 1:1 from the ticket color system */
+const COUNCIL_XLSX = {
+  'PSG Uniwide': { accent: 'FF0D1B3D', secondary: 'FFD4AF37', zebra: 'FFF4E6C0', lightText: true },
+  'PSG ICE':     { accent: 'FF8B5CF6', secondary: 'FF0D1B3D', zebra: 'FFE9E3FD', lightText: true },
+  'PSG SASTE':   { accent: 'FFDC2626', secondary: 'FF0D1B3D', zebra: 'FFFBDCDC', lightText: true },
+  'PSG SNAHS':   { accent: 'FFE11D48', secondary: 'FF0D1B3D', zebra: 'FFFBDFE7', lightText: true },
+  'PSG SBAHM':   { accent: 'FFD97706', secondary: 'FF0D1B3D', zebra: 'FFF7E7CD', lightText: false },
+  'PSG SITE':    { accent: 'FF0EA5E9', secondary: 'FF0D1B3D', zebra: 'FFD6EFFB', lightText: true },
+  'SOM':         { accent: 'FF10B981', secondary: 'FF0D1B3D', zebra: 'FFD4F5E8', lightText: false },
+  'PSG BEU':     { accent: 'FF38BDF8', secondary: 'FF0D1B3D', zebra: 'FFDDF1FE', lightText: false }
+};
 function councilToTabName(council) {
   const clean = String(council || '').replace(/^PSG\s+/i, '').trim();
   return (clean.toUpperCase() || 'OTHER').slice(0, 31);
 }
+/* "Nov 26 2026 02:34 PM" → real Excel datetime (fallback: raw string) */
+function parseStamp(v) {
+  const m = String(v || '').match(/^(\w{3})\s+(\d{1,2})\s+(\d{4})\s+(\d{1,2}):(\d{2})\s*(AM|PM)/i);
+  if (!m) return String(v || '');
+  const mon = ['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec'].indexOf(m[1].toLowerCase());
+  if (mon < 0) return String(v || '');
+  let h = (+m[4]) % 12; if (m[6].toUpperCase() === 'PM') h += 12;
+  return new Date(+m[3], mon, +m[2], h, +m[5]);
+}
+const STAMP_FMT = 'mmm d, h:mm AM/PM';
+
 async function buildMasterWorkbook(data) {
   const wb = new ExcelJS.Workbook();
-  wb.creator = 'PSG Admin Console';
+  wb.creator = 'PSG Uniwide — Admin Console';
+  wb.company = 'PSG Uniwide';
+  wb.title = 'Meeting For Paskuhan 2026 — Master List';
+  wb.subject = 'Registrant master list with per-council tabs';
+  wb.created = new Date();
+
   const COLS = [
     ['ticket_id', 'Ticket ID', 18], ['short_code', 'Code', 8], ['full_name', 'Name', 26],
     ['council', 'Council', 14], ['position', 'Position / Title', 26], ['student_number', 'Student No.', 14],
-    ['registered_at', 'Registered At', 22], ['checked_in_at', 'Checked In At', 22],
+    ['registered_at', 'Registered At', 20], ['checked_in_at', 'Checked In At', 20],
     ['checked_in_by', 'Checked In By', 14], ['no_show', 'No-Show', 9]];
-  const HEAD_FONT = { bold: true, color: { argb: 'FFFFFFFF' } };
-  const HEAD_FILL = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF2B5AA9' } };   // Paulinian blue
-  const TAB_BLUE = { tabColor: { argb: 'FF2B5AA9' } };
-  const TAB_GOLD = { tabColor: { argb: 'FFD4AF37' } };
+  const INST_BLUE = 'FF0D1B3D', INST_GOLD = 'FFD4AF37';
+  const GREEN_TINT = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFDCF5E3' } };
+  const RED_TEXT = { color: { argb: 'FFB00020' } };
 
-  function styleHeader(ws) {
-    ws.views = [{ state: 'frozen', ySplit: 1 }];
-    ws.columns = COLS.map(function (c) { return { key: c[0], header: c[1], width: c[2] }; });
-    const hr = ws.getRow(1);
-    hr.font = HEAD_FONT; hr.fill = HEAD_FILL;
+  function solid(argb) { return { type: 'pattern', pattern: 'solid', fgColor: { argb: argb } }; }
+  function banner(ws, title, colorCfg, lastCol) {
+    const c0 = ws.getCell('A1');
+    c0.value = title;
+    c0.font = { bold: true, size: 14, color: { argb: colorCfg.lightText ? 'FFFFFFFF' : INST_BLUE } };
+    c0.fill = solid(colorCfg.accent);
+    c0.alignment = { vertical: 'middle', horizontal: 'center' };
+    ws.mergeCells('A1:' + (lastCol || 'J') + '1');
+    ws.getRow(1).height = 26;
+  }
+  function styleHeader(ws, colorCfg, refs) {
+    ws.columns = refs.map(function (r) { return { key: r[0], width: r[2] }; });
+    const hr = ws.addRow(refs.map(function (r) { return r[1]; }));
+    for (let i = 1; i <= refs.length; i++) {
+      const c = hr.getCell(i);
+      c.font = { bold: true, color: { argb: colorCfg.lightText ? 'FFFFFFFF' : INST_BLUE } };
+      c.fill = solid(colorCfg.accent);
+      c.alignment = { vertical: 'middle' };
+    }
+    ws.views = [{ state: 'frozen', ySplit: 2 }];
+    ws.autoFilter = 'A2:J2';
+  }
+  function printSetup(ws, tabLabel) {
+    ws.pageSetup = {
+      paperSize: 9, orientation: 'landscape', fitToPage: true,
+      fitToWidth: 1, fitToHeight: 0, printTitlesRow: '1:2',
+      margins: { left: 0.5, right: 0.5, top: 0.6, bottom: 0.6, header: 0.3, footer: 0.3 }
+    };
+    ws.headerFooter = { oddFooter: '&L&8' + tabLabel + ' · Meeting For Paskuhan 2026&R&8Page &P of &N' };
   }
 
   /* ---- Tab 1: Headcount ---- */
-  const hc = wb.addWorksheet('Headcount', TAB_GOLD);
-  hc.views = [{ state: 'frozen', ySplit: 1 }];
-  hc.columns = [
-    { key: 'c', header: 'Council', width: 16 }, { key: 'r', header: 'Registered', width: 11 },
-    { key: 'i', header: 'Checked In', width: 11 }, { key: 'n', header: 'No-Show', width: 9 },
-    { key: 'a', header: 'Absent (not scanned)', width: 19 }];
-  hc.getRow(1).font = HEAD_FONT; hc.getRow(1).fill = HEAD_FILL;
+  const hc = wb.addWorksheet('Headcount');
+  hc.properties.tabColor = { argb: INST_GOLD };
+  const HC_BLUE = { accent: INST_BLUE, lightText: true };
+  banner(hc, 'HEADCOUNT · Meeting For Paskuhan 2026 · Master List', HC_BLUE, 'F');
+  styleHeader(hc, HC_BLUE, [
+    ['c', 'Council', 16], ['r', 'Registered', 11], ['i', 'Checked In', 11],
+    ['n', 'No-Show', 9], ['a', 'Absent (not scanned)', 19], ['p', 'Attendance', 11]]);
+  hc.autoFilter = 'A2:F2';
   let totR = 0, totI = 0, totN = 0, totA = 0;
   COUNCIL_ORDER.forEach(function (council) {
     const regs = (data.registrants || []).filter(function (r) { return r.council === council; });
@@ -484,33 +541,64 @@ async function buildMasterWorkbook(data) {
     const nI = regs.filter(function (r) { return !!r.checked_in_at; }).length;
     const nA = nR - nI - nN;
     totR += nR; totI += nI; totN += nN; totA += nA;
-    hc.addRow({ c: councilToTabName(council), r: nR, i: nI, n: nN, a: nA });
+    const row = hc.addRow({ c: councilToTabName(council), r: nR, i: nI, n: nN, a: nA });
+    const pc = hc.getCell('F' + row.number);
+    if (nR > 0) {
+      pc.value = nI / nR; pc.numFmt = '0%';
+      pc.fill = solid(nI / nR >= 0.85 ? 'FFDCF5E3' : nI / nR >= 0.6 ? 'FFFCF2CF' : 'FFFBDCDC');
+    } else { pc.value = '—'; pc.alignment = { horizontal: 'center' }; }
+    hc.getCell('A' + row.number).font = { bold: true };
   });
   const tr = hc.addRow({ c: 'TOTAL', r: totR, i: totI, n: totN, a: totA });
-  tr.font = { bold: true }; tr.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEFE6CF' } };
+  tr.font = { bold: true }; tr.fill = solid('FFEFE6CF');
+  if (totR > 0) { const tp = hc.getCell('F' + tr.number); tp.value = totI / totR; tp.numFmt = '0%'; tp.font = { bold: true }; }
   hc.addRow({ c: 'Generated ' + data.generatedAt + ' (' + data.tz + ')' }).font = { italic: true, color: { argb: 'FF666666' } };
+  printSetup(hc, 'Headcount');
 
-  /* ---- Tabs 2-9: one per council, ladder-sorted ---- */
+  /* ---- Tabs 2-9: one per council ---- */
   COUNCIL_ORDER.forEach(function (council) {
-    const ws = wb.addWorksheet(councilToTabName(council), TAB_BLUE);
-    styleHeader(ws);
-    sortRegistrants((data.registrants || []).filter(function (r) { return r.council === council; }))
-      .forEach(function (r) {
-        const row = ws.addRow(COLS.map(function (c) { return r[c[0]] == null ? '' : String(r[c[0]]); }));
-        if (isNoShow(r.no_show)) row.font = { color: { argb: 'FFB00020' } };   // red-flag no-shows
-      });
+    const cfg = COUNCIL_XLSX[council] || { accent: INST_BLUE, secondary: INST_GOLD, zebra: 'FFF3F5F9', lightText: true };
+    const tab = councilToTabName(council);
+    const ws = wb.addWorksheet(tab);
+    ws.properties.tabColor = { argb: cfg.accent };
+    banner(ws, council.toUpperCase() + ' · Meeting For Paskuhan 2026 · Master List', cfg);
+    styleHeader(ws, cfg, COLS);
+    const regs = sortRegistrants((data.registrants || []).filter(function (r) { return r.council === council; }));
+    if (!regs.length) {
+      ws.addRow([]);
+      const n = ws.addRow([]); ws.mergeCells('A' + n.number + ':J' + n.number);
+      const nc = ws.getCell('A' + n.number);
+      nc.value = '— No registrants yet —';
+      nc.font = { italic: true, color: { argb: 'FF999999' } };
+      nc.alignment = { horizontal: 'center' };
+    }
+    regs.forEach(function (r, i) {
+      const row = ws.addRow(COLS.map(function (c) {
+        return (c[0] === 'registered_at' || c[0] === 'checked_in_at')
+          ? (r[c[0]] ? parseStamp(r[c[0]]) : '')
+          : (r[c[0]] == null || r[c[0]] === false ? '' : String(r[c[0]]));
+      }));
+      row.getCell(7).numFmt = STAMP_FMT; row.getCell(8).numFmt = STAMP_FMT;
+      row.getCell(2).alignment = { horizontal: 'center' };
+      row.getCell(10).alignment = { horizontal: 'center' };
+      if (isNoShow(r.no_show)) { row.font = RED_TEXT; }
+      else if (r.checked_in_at) { row.fill = GREEN_TINT; }
+      else if (i % 2 === 1) { row.fill = solid(cfg.zebra); }
+    });
+    printSetup(ws, tab);
   });
 
   /* ---- Tab 10: scan log audit ---- */
-  const sl = wb.addWorksheet('Scan Log', { tabColor: { argb: 'FF888888' } });
-  sl.views = [{ state: 'frozen', ySplit: 1 }];
-  sl.columns = [
-    { key: 't', header: 'Timestamp (PHT)', width: 22 }, { key: 'id', header: 'Ticket ID', width: 18 },
-    { key: 'res', header: 'Result', width: 10 }, { key: 'st', header: 'Staff', width: 14 }];
-  sl.getRow(1).font = HEAD_FONT; sl.getRow(1).fill = HEAD_FILL;
+  const sl = wb.addWorksheet('Scan Log');
+  sl.properties.tabColor = { argb: 'FF888888' };
+  const SL_GRAY = { accent: 'FF555555', lightText: true };
+  banner(sl, 'SCAN LOG · Meeting For Paskuhan 2026 · Master List', SL_GRAY, 'D');
+  styleHeader(sl, SL_GRAY, [['t', 'Timestamp (PHT)', 22], ['id', 'Ticket ID', 18], ['res', 'Result', 10], ['st', 'Staff', 14]]);
+  sl.autoFilter = 'A2:D2';
   (data.scans || []).forEach(function (x) {
-    sl.addRow({ t: x.ts || '', id: x.ticket_id || '', res: x.result || '', st: x.staff || '' });
+    sl.addRow([x.ts || '', x.ticket_id || '', x.result || '', x.staff || '']);
   });
+  printSetup(sl, 'Scan Log');
 
   return wb.xlsx.writeBuffer();
 }
@@ -518,17 +606,24 @@ async function buildMasterWorkbook(data) {
 document.getElementById('csv-btn').addEventListener('click', async function () {
   if (!exportData) return;
   if (!window.ExcelJS) { alert('Workbook engine failed to load — check connection and reload the console.'); return; }
-  const buf = await buildMasterWorkbook(exportData);
-  const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = 'master-list-' + exportData.generatedAt.replace(/[: ]/g, '-') + '.xlsx';
-  a.click();
-  URL.revokeObjectURL(a.href);
+  const btn = document.getElementById('csv-btn');
+  const orig = btn.textContent;
+  btn.disabled = true; btn.textContent = 'Building workbook…';
+  try {
+    const buf = await buildMasterWorkbook(exportData);
+    const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'paskuhan2026-master-list-' + exportData.generatedAt.replace(/[: ]/g, '-') + '.xlsx';
+    a.click();
+    URL.revokeObjectURL(a.href);
+  } finally {
+    btn.disabled = false; btn.textContent = orig;
+  }
 });
 
 document.getElementById('print-btn').addEventListener('click', function () { window.print(); });
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a43c7a73cb1adb23',t:'MTc5MDg2ODMwOQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v31edd6df95cf4e85bb4c19e7a9bdbcba1788362987495" integrity="sha512-iIg7k2xntmwu6/uSb5tpc/hySgZc4eoL31yB29W6tJFo2akwjPWcEqnCEdJvGexCL0KEQwVYv5BlowfhVz26hg==" data-cf-beacon='{"version":"2024.11.0","token":"1954b47c125f43f8b4338b3c4f804e4f","spa":2}' crossorigin="anonymous"></script>
+<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v31edd6df95cf4e85bb4c19e7a9bdbcba1788362987495" integrity="sha512-iIg7k2xntmwu6/uSb5tpc/hySgZc4eoL31yB29W6tJFo2akwjPWcEqnCEdJvGexCL0KEQwVYv5BlowfhVz26hg==" data-cf-beacon='{"version":"2024.11.0","token":"1954b47c125f43f8b4338b3c4f804e4f","spa":2}' crossorigin="anonymous"></script>
 </body>
 </html>
