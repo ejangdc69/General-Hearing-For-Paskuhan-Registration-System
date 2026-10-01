@@ -114,6 +114,8 @@
   }
 
   </style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
+<script>window.ExcelJS || document.write('<script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js">\x3Cscript>')</script>
 </head>
 <body>
 <div class="wrap">
@@ -199,10 +201,10 @@
       <h2>Export &amp; master list</h2>
       <div class="row no-print">
         <button class="btn" id="load-export">Load export data</button>
-        <button class="btn ghost hidden" id="csv-btn">Download CSV</button>
+        <button class="btn ghost hidden" id="csv-btn">Download master workbook (.xlsx)</button>
         <button class="btn ghost hidden" id="print-btn">Print master list</button>
       </div>
-      <div class="note no-print">Master list (name · council · position · code) is the offline fallback for the door. The CSV carries ticket IDs, check-in timestamps, scanning staff and no-show flags for handover.</div>
+      <div class="note no-print">Master list (name · council · position · code) is the offline fallback for the door. Download builds an Excel workbook in-browser: a Headcount tab plus one tab per council, each tab sorted by the officer ladder and carrying ticket IDs, check-in timestamps, scanning staff and no-show flags for handover.</div>
       <div class="scroll" id="export-box"><p class="note">Not loaded yet.</p></div>
     </div>
 
@@ -434,27 +436,99 @@ function sortRegistrants(regs) {
   });
 }
 
-document.getElementById('csv-btn').addEventListener('click', function () {
+/* ================ MASTER WORKBOOK (per-council tabs, XLSX) ================
+   One click → one .xlsx: Headcount tab (per-council registered / checked-in /
+   no-show accounting for post-event reconciliation) + one tab per council
+   (sorted by the officer ladder, names A-Z within rung) + Scan Log audit tab.
+   Pure-function core (buildMasterWorkbook) is unit-testable outside the
+   browser; DOM only touches it at the click seam. */
+const NO_SHOW_WORDS = ['TRUE', 'true', 'yes', 'Yes', '1'];
+function isNoShow(v) { return v === true || NO_SHOW_WORDS.indexOf(String(v)) !== -1; }
+function councilToTabName(council) {
+  const clean = String(council || '').replace(/^PSG\s+/i, '').trim();
+  return (clean.toUpperCase() || 'OTHER').slice(0, 31);
+}
+async function buildMasterWorkbook(data) {
+  const wb = new ExcelJS.Workbook();
+  wb.creator = 'PSG Admin Console';
+  const COLS = [
+    ['ticket_id', 'Ticket ID', 18], ['short_code', 'Code', 8], ['full_name', 'Name', 26],
+    ['council', 'Council', 14], ['position', 'Position / Title', 26], ['student_number', 'Student No.', 14],
+    ['registered_at', 'Registered At', 22], ['checked_in_at', 'Checked In At', 22],
+    ['checked_in_by', 'Checked In By', 14], ['no_show', 'No-Show', 9]];
+  const HEAD_FONT = { bold: true, color: { argb: 'FFFFFFFF' } };
+  const HEAD_FILL = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF2B5AA9' } };   // Paulinian blue
+  const TAB_BLUE = { tabColor: { argb: 'FF2B5AA9' } };
+  const TAB_GOLD = { tabColor: { argb: 'FFD4AF37' } };
+
+  function styleHeader(ws) {
+    ws.views = [{ state: 'frozen', ySplit: 1 }];
+    ws.columns = COLS.map(function (c) { return { key: c[0], header: c[1], width: c[2] }; });
+    const hr = ws.getRow(1);
+    hr.font = HEAD_FONT; hr.fill = HEAD_FILL;
+  }
+
+  /* ---- Tab 1: Headcount ---- */
+  const hc = wb.addWorksheet('Headcount', TAB_GOLD);
+  hc.views = [{ state: 'frozen', ySplit: 1 }];
+  hc.columns = [
+    { key: 'c', header: 'Council', width: 16 }, { key: 'r', header: 'Registered', width: 11 },
+    { key: 'i', header: 'Checked In', width: 11 }, { key: 'n', header: 'No-Show', width: 9 },
+    { key: 'a', header: 'Absent (not scanned)', width: 19 }];
+  hc.getRow(1).font = HEAD_FONT; hc.getRow(1).fill = HEAD_FILL;
+  let totR = 0, totI = 0, totN = 0, totA = 0;
+  COUNCIL_ORDER.forEach(function (council) {
+    const regs = (data.registrants || []).filter(function (r) { return r.council === council; });
+    const nR = regs.length;
+    const nN = regs.filter(function (r) { return isNoShow(r.no_show); }).length;
+    const nI = regs.filter(function (r) { return !!r.checked_in_at; }).length;
+    const nA = nR - nI - nN;
+    totR += nR; totI += nI; totN += nN; totA += nA;
+    hc.addRow({ c: councilToTabName(council), r: nR, i: nI, n: nN, a: nA });
+  });
+  const tr = hc.addRow({ c: 'TOTAL', r: totR, i: totI, n: totN, a: totA });
+  tr.font = { bold: true }; tr.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEFE6CF' } };
+  hc.addRow({ c: 'Generated ' + data.generatedAt + ' (' + data.tz + ')' }).font = { italic: true, color: { argb: 'FF666666' } };
+
+  /* ---- Tabs 2-9: one per council, ladder-sorted ---- */
+  COUNCIL_ORDER.forEach(function (council) {
+    const ws = wb.addWorksheet(councilToTabName(council), TAB_BLUE);
+    styleHeader(ws);
+    sortRegistrants((data.registrants || []).filter(function (r) { return r.council === council; }))
+      .forEach(function (r) {
+        const row = ws.addRow(COLS.map(function (c) { return r[c[0]] == null ? '' : String(r[c[0]]); }));
+        if (isNoShow(r.no_show)) row.font = { color: { argb: 'FFB00020' } };   // red-flag no-shows
+      });
+  });
+
+  /* ---- Tab 10: scan log audit ---- */
+  const sl = wb.addWorksheet('Scan Log', { tabColor: { argb: 'FF888888' } });
+  sl.views = [{ state: 'frozen', ySplit: 1 }];
+  sl.columns = [
+    { key: 't', header: 'Timestamp (PHT)', width: 22 }, { key: 'id', header: 'Ticket ID', width: 18 },
+    { key: 'res', header: 'Result', width: 10 }, { key: 'st', header: 'Staff', width: 14 }];
+  sl.getRow(1).font = HEAD_FONT; sl.getRow(1).fill = HEAD_FILL;
+  (data.scans || []).forEach(function (x) {
+    sl.addRow({ t: x.ts || '', id: x.ticket_id || '', res: x.result || '', st: x.staff || '' });
+  });
+
+  return wb.xlsx.writeBuffer();
+}
+
+document.getElementById('csv-btn').addEventListener('click', async function () {
   if (!exportData) return;
-  const cols = ['ticket_id', 'short_code', 'full_name', 'council', 'position', 'student_number',
-    'registered_at', 'checked_in_at', 'checked_in_by', 'no_show'];
-  let csv = cols.join(',') + '\n';
-  sortRegistrants(exportData.registrants).forEach(function (r) {
-    csv += cols.map(function (c) { return '"' + String(r[c] || '').replace(/"/g, '""') + '"'; }).join(',') + '\n';
-  });
-  csv += '\nscans_log_timestamp,ticket_id,result,staff\n';
-  (exportData.scans || []).forEach(function (s) {
-    csv += [s.ts, s.ticket_id, s.result, s.staff].map(function (v) { return '"' + String(v || '').replace(/"/g, '""') + '"'; }).join(',') + '\n';
-  });
-  const blob = new Blob([csv], { type: 'text/csv' });
+  if (!window.ExcelJS) { alert('Workbook engine failed to load — check connection and reload the console.'); return; }
+  const buf = await buildMasterWorkbook(exportData);
+  const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = 'hearing-export-' + exportData.generatedAt.replace(/[: ]/g, '-') + '.csv';
+  a.download = 'master-list-' + exportData.generatedAt.replace(/[: ]/g, '-') + '.xlsx';
   a.click();
+  URL.revokeObjectURL(a.href);
 });
 
 document.getElementById('print-btn').addEventListener('click', function () { window.print(); });
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a43c59a03c5ddb24',t:'MTc5MDg2Njk2NA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v31edd6df95cf4e85bb4c19e7a9bdbcba1788362987495" integrity="sha512-iIg7k2xntmwu6/uSb5tpc/hySgZc4eoL31yB29W6tJFo2akwjPWcEqnCEdJvGexCL0KEQwVYv5BlowfhVz26hg==" data-cf-beacon='{"version":"2024.11.0","token":"1954b47c125f43f8b4338b3c4f804e4f","spa":2}' crossorigin="anonymous"></script>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a43c7a73cb1adb23',t:'MTc5MDg2ODMwOQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v31edd6df95cf4e85bb4c19e7a9bdbcba1788362987495" integrity="sha512-iIg7k2xntmwu6/uSb5tpc/hySgZc4eoL31yB29W6tJFo2akwjPWcEqnCEdJvGexCL0KEQwVYv5BlowfhVz26hg==" data-cf-beacon='{"version":"2024.11.0","token":"1954b47c125f43f8b4338b3c4f804e4f","spa":2}' crossorigin="anonymous"></script>
 </body>
 </html>
