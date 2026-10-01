@@ -452,14 +452,14 @@ function isNoShow(v) { return v === true || NO_SHOW_WORDS.indexOf(String(v)) !==
 
 /* Council identity — pulled 1:1 from the ticket color system */
 const COUNCIL_XLSX = {
-  'PSG Uniwide': { accent: 'FF0D1B3D', secondary: 'FFD4AF37', zebra: 'FFF4E6C0', lightText: true },
-  'PSG ICE':     { accent: 'FF8B5CF6', secondary: 'FF0D1B3D', zebra: 'FFE9E3FD', lightText: true },
-  'PSG SASTE':   { accent: 'FFDC2626', secondary: 'FF0D1B3D', zebra: 'FFFBDCDC', lightText: true },
-  'PSG SNAHS':   { accent: 'FFE11D48', secondary: 'FF0D1B3D', zebra: 'FFFBDFE7', lightText: true },
-  'PSG SBAHM':   { accent: 'FFD97706', secondary: 'FF0D1B3D', zebra: 'FFF7E7CD', lightText: false },
-  'PSG SITE':    { accent: 'FF0EA5E9', secondary: 'FF0D1B3D', zebra: 'FFD6EFFB', lightText: true },
-  'SOM':         { accent: 'FF10B981', secondary: 'FF0D1B3D', zebra: 'FFD4F5E8', lightText: false },
-  'PSG BEU':     { accent: 'FF38BDF8', secondary: 'FF0D1B3D', zebra: 'FFDDF1FE', lightText: false }
+  'PSG Uniwide': { accent: 'FF15803D', bannerAccent: 'FFD4AF37', bannerText: 'FF0D1B3D', zebra: 'FFDCEFE0', lightText: true },
+  'PSG ICE':     { accent: 'FF8B5CF6', zebra: 'FFE9E3FD', lightText: true },
+  'PSG SASTE':   { accent: 'FF2563EB', zebra: 'FFDBEAFE', lightText: true },
+  'PSG SNAHS':   { accent: 'FFDC2626', zebra: 'FFFBDCDC', lightText: true },
+  'PSG SBAHM':   { accent: 'FF16A34A', zebra: 'FFDCF5E3', lightText: true },
+  'PSG SITE':    { accent: 'FF6B7280', zebra: 'FFE8EAED', lightText: true },
+  'SOM':         { accent: 'FFFFFFFF', zebra: 'FFF2F2F2', lightText: false },
+  'PSG BEU':     { accent: 'FFFACC15', zebra: 'FFFEF9C3', lightText: false }
 };
 function councilToTabName(council) {
   const clean = String(council || '').replace(/^PSG\s+/i, '').trim();
@@ -480,7 +480,7 @@ async function buildMasterWorkbook(data) {
   const wb = new ExcelJS.Workbook();
   wb.creator = 'PSG Uniwide — Admin Console';
   wb.company = 'PSG Uniwide';
-  wb.title = 'Meeting For Paskuhan 2026 — Master List';
+  wb.title = 'Meeting For Paskuhan 2026 Master List';
   wb.subject = 'Registrant master list with per-council tabs';
   wb.created = new Date();
 
@@ -497,8 +497,8 @@ async function buildMasterWorkbook(data) {
   function banner(ws, title, colorCfg, lastCol) {
     const c0 = ws.getCell('A1');
     c0.value = title;
-    c0.font = { bold: true, size: 14, color: { argb: colorCfg.lightText ? 'FFFFFFFF' : INST_BLUE } };
-    c0.fill = solid(colorCfg.accent);
+    c0.font = { bold: true, size: 14, color: { argb: colorCfg.bannerText || (colorCfg.lightText ? 'FFFFFFFF' : INST_BLUE) } };
+    c0.fill = solid(colorCfg.bannerAccent || colorCfg.accent);
     c0.alignment = { vertical: 'middle', horizontal: 'center' };
     ws.mergeCells('A1:' + (lastCol || 'J') + '1');
     ws.getRow(1).height = 26;
@@ -510,6 +510,7 @@ async function buildMasterWorkbook(data) {
       const c = hr.getCell(i);
       c.font = { bold: true, color: { argb: colorCfg.lightText ? 'FFFFFFFF' : INST_BLUE } };
       c.fill = solid(colorCfg.accent);
+      c.border = { bottom: { style: 'thin', color: { argb: 'FF0D1B3D' } } };
       c.alignment = { vertical: 'middle' };
     }
     ws.views = [{ state: 'frozen', ySplit: 2 }];
@@ -528,7 +529,7 @@ async function buildMasterWorkbook(data) {
   const hc = wb.addWorksheet('Headcount');
   hc.properties.tabColor = { argb: INST_GOLD };
   const HC_BLUE = { accent: INST_BLUE, lightText: true };
-  banner(hc, 'HEADCOUNT · Meeting For Paskuhan 2026 · Master List', HC_BLUE, 'F');
+  banner(hc, 'HEADCOUNT · Meeting For Paskuhan 2026 Master List', HC_BLUE, 'F');
   styleHeader(hc, HC_BLUE, [
     ['c', 'Council', 16], ['r', 'Registered', 11], ['i', 'Checked In', 11],
     ['n', 'No-Show', 9], ['a', 'Absent (not scanned)', 19], ['p', 'Attendance', 11]]);
@@ -561,7 +562,7 @@ async function buildMasterWorkbook(data) {
     const tab = councilToTabName(council);
     const ws = wb.addWorksheet(tab);
     ws.properties.tabColor = { argb: cfg.accent };
-    banner(ws, council.toUpperCase() + ' · Meeting For Paskuhan 2026 · Master List', cfg);
+    banner(ws, council.toUpperCase() + ' · Meeting For Paskuhan 2026 Master List', cfg);
     styleHeader(ws, cfg, COLS);
     const regs = sortRegistrants((data.registrants || []).filter(function (r) { return r.council === council; }));
     if (!regs.length) {
@@ -592,7 +593,7 @@ async function buildMasterWorkbook(data) {
   const sl = wb.addWorksheet('Scan Log');
   sl.properties.tabColor = { argb: 'FF888888' };
   const SL_GRAY = { accent: 'FF555555', lightText: true };
-  banner(sl, 'SCAN LOG · Meeting For Paskuhan 2026 · Master List', SL_GRAY, 'D');
+  banner(sl, 'SCAN LOG · Meeting For Paskuhan 2026 Master List', SL_GRAY, 'D');
   styleHeader(sl, SL_GRAY, [['t', 'Timestamp (PHT)', 22], ['id', 'Ticket ID', 18], ['res', 'Result', 10], ['st', 'Staff', 14]]);
   sl.autoFilter = 'A2:D2';
   (data.scans || []).forEach(function (x) {
