@@ -400,12 +400,46 @@ function esc(s) {
   });
 }
 
+/* ================= CSV AUTO-SORTER (council → role ladder → name) ========
+   Secretary-directed master-list order, applied client-side at download time
+   — the backend export payload stays untouched (no Apps Script redeploy).
+   Council order is the canonical spec order; edit COUNCIL_ORDER to reshuffle.
+   Position matching is fuzzy (free-text Tally field): abbreviations and
+   variants land on the intended rung; unmapped positions sink to the bottom
+   of their council, name-sorted. */
+const COUNCIL_ORDER = ['PSG Uniwide', 'PSG ICE', 'PSG SASTE', 'PSG SNAHS', 'PSG SBAHM', 'PSG SITE', 'SOM', 'PSG BEU'];
+function posRank(position) {
+  const s = String(position || '').toLowerCase().replace(/[.\-,']/g, ' ').replace(/\s+/g, ' ').trim();
+  if (!s) return 10;
+  const asst = /\b(asst|assistant|ast)\b/.test(s);
+  if (/\b(rep|representative)s?\b/.test(s)) return 0;
+  if (/\bvice\b|\bvg\b/.test(s)) return 2;                                  // vice governor first — it also matches 'governor'
+  if (/\bgovernors?\b/.test(s)) return 1;
+  if (/\bsecretary\b|\bsec\b/.test(s)) return asst ? 4 : 3;
+  if (/\btreasurers?\b|\btreas\b/.test(s)) return asst ? 6 : 5;
+  if (/public relations|\bpro\b|p[\s.]*r[\s.]*o/.test(s) && !/production/.test(s)) return 7;
+  if (/council|kagawad/.test(s)) return 8;
+  if (/multimedia|(^|\s)mm(\s|$)/.test(s.replace('coordinator', ' '))) return 9;
+  return 10;
+}
+function sortRegistrants(regs) {
+  return regs.slice().sort(function (a, b) {
+    const ca = COUNCIL_ORDER.indexOf(a.council), cb = COUNCIL_ORDER.indexOf(b.council);
+    const ka = ca < 0 ? 99 : ca, kb = cb < 0 ? 99 : cb;
+    if (ka !== kb) return ka - kb;
+    const ra = posRank(a.position), rb = posRank(b.position);
+    if (ra !== rb) return ra - rb;
+    const na = String(a.full_name || '').toLowerCase(), nb = String(b.full_name || '').toLowerCase();
+    return na < nb ? -1 : na > nb ? 1 : 0;
+  });
+}
+
 document.getElementById('csv-btn').addEventListener('click', function () {
   if (!exportData) return;
   const cols = ['ticket_id', 'short_code', 'full_name', 'council', 'position', 'student_number',
     'registered_at', 'checked_in_at', 'checked_in_by', 'no_show'];
   let csv = cols.join(',') + '\n';
-  exportData.registrants.forEach(function (r) {
+  sortRegistrants(exportData.registrants).forEach(function (r) {
     csv += cols.map(function (c) { return '"' + String(r[c] || '').replace(/"/g, '""') + '"'; }).join(',') + '\n';
   });
   csv += '\nscans_log_timestamp,ticket_id,result,staff\n';
@@ -421,5 +455,6 @@ document.getElementById('csv-btn').addEventListener('click', function () {
 
 document.getElementById('print-btn').addEventListener('click', function () { window.print(); });
 </script>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a43c59a03c5ddb24',t:'MTc5MDg2Njk2NA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v31edd6df95cf4e85bb4c19e7a9bdbcba1788362987495" integrity="sha512-iIg7k2xntmwu6/uSb5tpc/hySgZc4eoL31yB29W6tJFo2akwjPWcEqnCEdJvGexCL0KEQwVYv5BlowfhVz26hg==" data-cf-beacon='{"version":"2024.11.0","token":"1954b47c125f43f8b4338b3c4f804e4f","spa":2}' crossorigin="anonymous"></script>
 </body>
 </html>
