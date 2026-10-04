@@ -131,6 +131,15 @@
     font-family: 'IBM Plex Mono', monospace; font-size: 7px;
     letter-spacing: 0.12em; color: rgba(244,245,237,0.5);
   }
+  .seal-ph.with-seal {
+    border: 1px solid rgba(244,245,237,0.55);
+    border-radius: 7px;
+    background: #F4F5ED;
+    overflow: hidden;
+  }
+  .seal-ph.with-seal img {
+    display: block; width: 100%; height: 100%; object-fit: contain;
+  }
 
   /* ---- body grid ---- */
   .body-grid {
@@ -301,6 +310,16 @@ const CREDIT = { text: 'Registration by PSG-UNIWIDE', position: 'footer-right' }
    plate 12% / footer 20%→10%). Full tables: docs/01-TOKEN-TABLES.md.
    Hairline + QR panel cream #F4F5ED is constant across all 8 (structural).
    =========================================================================*/
+const DEPARTMENT_SEALS = {
+  'PSG Uniwide': 'assets/seals/UNIWIDE.png',
+  'PSG ICE': 'assets/seals/ICE.png',
+  'PSG SASTE': 'assets/seals/SASTE.png',
+  'PSG SNAHS': 'assets/seals/SNAHS.png',
+  'PSG SBAHM': 'assets/seals/SBAHM.png',
+  'PSG SITE': 'assets/seals/SITE.png'
+  // SOM and PSG BEU remain on the placeholder until their seal files are supplied.
+};
+
 const THEMES = {
   'PSG Uniwide': { key: 'uniwide', accent: '#DBBE66', deepest: '#123A25', base: '#216942', mid: '#2F935E', glow: '#5CCC90', ribbonLeft: '#288051', ribbonRight: '#15422A', plate: '#17271E', footerTop: '#184E31', footerBottom: '#0C2719', fx: 'burst',    icon: 'star' },
   'PSG ICE':     { key: 'ice',     accent: '#DBBE66', deepest: '#211439', base: '#3C2466', mid: '#54328F', glow: '#8660C7', ribbonLeft: '#492C7D', ribbonRight: '#261740', plate: '#1D1726', footerTop: '#2C1B4B', footerBottom: '#160D26', fx: 'sweep',    icon: 'truss' },
@@ -444,6 +463,18 @@ const FX = (function () {
 /* ============================ RENDER ===================================== */
 function $(id) { return document.getElementById(id); }
 function el(tag, cls) { const e = document.createElement(tag); if (cls) e.className = cls; return e; }
+function addSealImage(slot, council, useUniwide) {
+  const owner = useUniwide ? 'PSG Uniwide' : council;
+  const src = DEPARTMENT_SEALS[owner];
+  if (!src) { slot.textContent = 'SEAL'; return; }
+  slot.classList.add('with-seal');
+  const img = el('img');
+  img.src = src;
+  img.alt = owner + ' seal';
+  img.decoding = 'async';
+  img.onerror = function () { slot.classList.remove('with-seal'); slot.textContent = 'SEAL'; };
+  slot.appendChild(img);
+}
 function hexToRgba(hex, a) {
   const h = hex.replace('#', '');
   const r = parseInt(h.substr(0, 2), 16), g = parseInt(h.substr(2, 2), 16), b = parseInt(h.substr(4, 2), 16);
@@ -496,7 +527,7 @@ function fillTicket(ticket, theme) {
   /* header strip: seal placeholder | titles | department icon (FIXED
      position: panel header, right side — identical across all 8) */
   const head = el('div', 'head-row');
-  const seal = el('div', 'seal-ph'); seal.textContent = 'SEAL';
+  const seal = el('div', 'seal-ph'); addSealImage(seal, ticket.council, false);
   const titles = el('div', 'head-titles');
   const ev = el('div', 'head-event'); ev.textContent = EVENT.eyebrow;
   const cn = el('div', 'head-council'); cn.textContent = ticket.council; cn.style.color = theme.accent;
@@ -541,8 +572,8 @@ function fillTicket(ticket, theme) {
   const motto = el('div', 'motto'); motto.textContent = '“' + EVENT.motto + '”';
   parts.panel.appendChild(motto);
 
-  /* footer: seal placeholder | meta | credit (position configurable) */
-  const fseal = el('div', 'seal-ph'); fseal.textContent = 'SEAL';
+  /* Footer seal is always the PSG Uniwide seal, regardless of ticket council. */
+  const fseal = el('div', 'seal-ph'); addSealImage(fseal, ticket.council, true);
   const meta = el('div', 'footer-meta'); meta.textContent = EVENT.footerMeta;
   const credit = el('span', 'credit'); credit.textContent = CREDIT.text;
   parts.footer.appendChild(fseal);
@@ -849,5 +880,6 @@ document.getElementById('agenda-btn').addEventListener('click', async function (
 
 document.addEventListener('DOMContentLoaded', boot);
 </script>
-</body>
+<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v31edd6df95cf4e85bb4c19e7a9bdbcba1788362987495" integrity="sha512-iIg7k2xntmwu6/uSb5tpc/hySgZc4eoL31yB29W6tJFo2akwjPWcEqnCEdJvGexCL0KEQwVYv5BlowfhVz26hg==" data-cf-beacon='{"version":"2024.11.0","token":"1954b47c125f43f8b4338b3c4f804e4f","spa":2}' crossorigin="anonymous"></script>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a456269f4e74383f',t:'MTc5MTEzNzUwNQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
