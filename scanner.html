@@ -212,6 +212,297 @@
   .lookup-item .badge.pending { background: rgba(219,190,102,0.3); color: var(--gold); }
 
   </style>
+<style id="scanner-visual-refresh">
+  :root {
+    --panel: rgba(16, 57, 40, 0.88);
+    --panel-soft: rgba(17, 64, 42, 0.58);
+    --line: rgba(244,245,237,0.18);
+    --muted: rgba(244,245,237,0.62);
+    --danger: #F0A79E;
+  }
+  body {
+    min-height: 100vh;
+    min-height: 100svh;
+    background-attachment: scroll;
+    background-image:
+      radial-gradient(110% 70% at 50% 0%, rgba(51,193,127,0.14), rgba(12,44,29,0) 62%),
+      linear-gradient(165deg, #123F2B 0%, #0C2C1D 76%);
+  }
+  #app {
+    width: min(100%, 920px);
+    height: auto;
+    min-height: 100vh;
+    min-height: 100svh;
+    margin: 0 auto;
+    padding: 0 clamp(12px, 2.6vw, 24px) 12px;
+    overflow-x: hidden;
+  }
+  #app.on { display: flex; }
+  header {
+    width: 100%; display: flex; align-items: center; justify-content: space-between;
+    gap: 16px; text-align: left; padding: 16px 0 12px;
+  }
+  header .eyebrow {
+    display: flex; align-items: center; gap: 8px;
+    font-family: var(--mono); font-size: 9px; letter-spacing: 0.14em;
+    color: var(--gold); text-transform: uppercase;
+  }
+  .brand-mark {
+    display: inline-flex; align-items: center; justify-content: center;
+    min-width: 32px; height: 22px; padding: 0 6px; border-radius: 6px;
+    background: var(--gold); color: var(--sys-deepest);
+    font-family: var(--sans); font-size: 11px; font-weight: 700; letter-spacing: 0.04em;
+  }
+  header h1 {
+    font-family: var(--serif); font-weight: 600;
+    font-size: clamp(18px, 2.7vw, 22px); letter-spacing: 0.015em;
+    text-transform: none; margin: 5px 0 0; line-height: 1.18;
+  }
+  .staff-tag {
+    display: flex; align-items: center; gap: 10px; flex: 0 0 auto;
+    max-width: 285px; margin: 0; padding: 9px 12px;
+    border: 1px solid var(--line); border-radius: 12px;
+    background: rgba(8,31,21,0.54); text-align: left;
+  }
+  .staff-avatar {
+    display: inline-flex; width: 31px; height: 31px; align-items: center; justify-content: center;
+    flex: 0 0 31px; border-radius: 50%; border: 1px solid rgba(94,212,157,0.46);
+    background: rgba(46,158,106,0.18); color: var(--sys-hi); font-family: var(--sans); font-size: 15px;
+  }
+  .staff-copy { display: flex; min-width: 0; flex-direction: column; gap: 1px; }
+  .staff-tag .shift-label { font-family: var(--mono); font-size: 8px; letter-spacing: 0.1em; color: var(--sys-hi); }
+  .staff-tag b { color: var(--cream); font-family: var(--mono); font-size: 10.5px; font-weight: 600; letter-spacing: 0.02em; }
+  .staff-tag .staff-note { color: var(--muted); font-family: var(--mono); font-size: 8px; letter-spacing: 0; }
+
+  .ops-strip {
+    width: min(100%, 760px); flex: 0 0 auto; display: flex; align-items: stretch;
+    justify-content: space-between; gap: 9px; margin: 0 auto 7px;
+  }
+  .ops-chip {
+    display: flex; align-items: center; gap: 9px; min-height: 43px;
+    padding: 8px 12px; border: 1px solid var(--line); border-radius: 11px;
+    background: var(--panel-soft); color: var(--cream);
+  }
+  .ops-state { flex: 1 1 0; }
+  .ops-led, .sync-dot, .device-led, .camera-led {
+    display: inline-block; flex: 0 0 auto; width: 8px; height: 8px; border-radius: 50%;
+    background: rgba(244,245,237,0.45);
+  }
+  .ops-copy { display: flex; flex-direction: column; gap: 2px; }
+  .ops-caption { font-family: var(--mono); font-size: 7.5px; letter-spacing: 0.13em; color: var(--muted); }
+  .ops-state strong { font-family: var(--sans); font-size: 10.5px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; }
+  .ops-state.open { border-color: rgba(94,212,157,0.34); }
+  .ops-state.open .ops-led, .sync-live .sync-dot { background: var(--sys-hi); box-shadow: 0 0 8px rgba(94,212,157,0.38); }
+  .ops-state.open strong { color: var(--sys-hi); }
+  .ops-state.closed { border-color: rgba(240,167,158,0.8); background: rgba(77,30,27,0.72); }
+  .ops-state.closed .ops-led, .sync-stale .sync-dot { background: var(--danger); box-shadow: 0 0 7px rgba(240,167,158,0.3); }
+  .ops-state.closed strong { color: #FFE0DC; }
+  .ops-state.unknown .ops-led, .sync-waiting .sync-dot { background: var(--gold); }
+  .ops-state.unknown strong { color: var(--gold); }
+  .ops-sync {
+    flex: 0 1 auto; justify-content: flex-end; font-family: var(--mono); font-size: 8.5px;
+    letter-spacing: 0.04em; color: var(--muted); min-width: 205px;
+  }
+  .ops-sync.sync-live { color: #BFEBD2; }
+  .ops-sync.sync-stale { color: #FFE0DC; border-color: rgba(240,167,158,0.56); }
+  .ops-sync.sync-waiting { color: #E9D89E; }
+
+  #scanner-wrap {
+    flex: 1 0 auto; position: relative; display: flex; align-items: center; justify-content: center;
+    width: 100%; min-height: 230px; padding: 4px 0 8px;
+  }
+  .camera-card {
+    width: min(100%, 560px); padding: 11px; display: flex; flex-direction: column; gap: 8px;
+    border: 1px solid rgba(244,245,237,0.2); border-radius: 17px;
+    background: linear-gradient(155deg, rgba(26,97,64,0.34), rgba(8,31,21,0.82));
+    box-shadow: 0 12px 28px rgba(0,0,0,0.24), inset 0 1px 0 rgba(244,245,237,0.08);
+  }
+  .camera-card-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 1px 2px; }
+  .camera-label { display: flex; align-items: center; gap: 7px; font-family: var(--mono); font-size: 8.5px; letter-spacing: 0.11em; color: var(--cream); }
+  .camera-led { width: 7px; height: 7px; background: var(--sys-hi); }
+  .camera-mode { font-family: var(--mono); font-size: 8px; letter-spacing: 0.09em; color: var(--gold); }
+  #reader {
+    width: 100%; min-height: 210px; margin: 0 auto; overflow: hidden; border-radius: 12px;
+    background: #071C13; border: 1px solid rgba(244,245,237,0.16); color: var(--cream);
+  }
+  #reader video {
+    display: block; width: 100% !important; height: auto !important; max-height: 42vh;
+    object-fit: cover; border: 0; border-radius: 10px; box-shadow: none;
+  }
+  #reader__scan_region { min-height: 190px; overflow: hidden; border-radius: 10px; }
+  #reader__scan_region video { max-height: 42vh; }
+  #reader__dashboard_section { padding: 5px 4px 1px; color: var(--muted); font: 9px var(--mono); }
+  #reader__dashboard_section button, #reader__dashboard_section select {
+    min-height: 34px; margin: 3px; padding: 6px 9px; border: 1px solid var(--line); border-radius: 7px;
+    background: #123F2B; color: var(--cream); font: 10px var(--mono);
+  }
+  .scan-hint {
+    position: static; inset: auto; padding: 1px 2px 0; color: var(--muted); text-align: center;
+    font-family: var(--mono); font-size: 9px; letter-spacing: 0.035em; line-height: 1.45; text-transform: none;
+  }
+  .scan-error {
+    width: min(100%,560px); margin: 0 auto 5px; padding: 10px 12px;
+    border: 1px solid rgba(240,167,158,0.54); background: rgba(77,30,27,0.72);
+    border-radius: 10px; font-size: 10px; line-height: 1.5;
+  }
+  .row-btns {
+    width: min(100%,560px); flex: 0 0 auto; display: flex; justify-content: space-between;
+    gap: 9px; margin: 0 auto; padding: 0;
+  }
+  .toggle-btn {
+    min-height: 42px; flex: 1 1 auto; padding: 9px 12px; border: 1px solid var(--line); border-radius: 10px;
+    background: rgba(16,57,40,0.62); color: var(--cream); text-decoration: none; cursor: pointer;
+    font-family: var(--mono); font-size: 9.5px; letter-spacing: 0.025em; transition: background-color .16s ease, border-color .16s ease, color .16s ease;
+  }
+  #logout-btn { flex: 0 0 auto; min-width: 103px; color: var(--muted); }
+  .toggle-btn:hover { background: rgba(26,97,64,0.7); border-color: rgba(219,190,102,0.58); color: var(--gold); }
+  .toggle-btn:focus-visible, .manual-entry button:focus-visible, .manual-entry input:focus-visible {
+    outline: 2px solid var(--gold); outline-offset: 2px;
+  }
+  .manual-entry {
+    width: min(100%,560px); margin: 0 auto; padding: 6px 0 3px; display: none;
+    gap: 8px; align-items: center;
+  }
+  .manual-entry input {
+    min-width: 0; min-height: 42px; flex: 1; padding: 10px 12px; border-radius: 9px;
+    background: rgba(6,25,17,0.82); border-color: rgba(244,245,237,0.22); font-size: 11px;
+  }
+  .manual-entry button {
+    min-height: 42px; padding: 9px 15px; border-radius: 9px; font-size: 10px;
+  }
+  #lookup-results {
+    width: min(100%,560px); max-height: min(26vh,200px); margin: 0 auto 4px;
+    overflow-y: auto; padding: 0 1px 2px;
+  }
+  .lookup-item { border-color: var(--line); background: rgba(16,57,40,0.92); }
+  .lookup-item:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+  .lookup-item .who { font-size: 13px; }
+  .lookup-item .meta { font-size: 9px; }
+  .lookup-item .badge { min-height: 26px; display: inline-flex; align-items: center; }
+
+  #stats {
+    width: min(100%,760px); flex: 0 0 auto; display: block; margin: 8px auto 2px; padding: 11px 12px 9px;
+    border: 1px solid var(--line); border-radius: 15px; background: rgba(8,31,21,0.73);
+    box-shadow: 0 9px 22px rgba(0,0,0,0.18); color: var(--cream); font-family: var(--sans);
+    font-size: 12px; letter-spacing: normal;
+  }
+  .stats-heading { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 8px; }
+  .stats-kicker { font-family: var(--mono); font-size: 7.5px; letter-spacing: 0.13em; color: var(--gold); }
+  .stats-title { margin-top: 2px; font-family: var(--serif); font-size: 13px; font-weight: 600; color: var(--cream); }
+  .device-tag { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font: 8px var(--mono); letter-spacing: 0.08em; }
+  .device-led { width: 6px; height: 6px; background: var(--sys-hi); }
+  .metric-grid { display: grid; grid-template-columns: 1.2fr 1fr 1fr; gap: 7px; }
+  .metric-card {
+    min-width: 0; display: flex; flex-direction: column; align-items: flex-start; justify-content: center;
+    padding: 8px 10px; border: 1px solid rgba(244,245,237,0.11); border-radius: 10px;
+    background: rgba(26,97,64,0.18);
+  }
+  .metric-label { color: var(--muted); font-family: var(--mono); font-size: 7.6px; letter-spacing: 0.08em; text-transform: uppercase; }
+  .metric-main { width: 100%; display: flex; align-items: baseline; justify-content: space-between; gap: 5px; margin-top: 3px; }
+  .metric-main > b, .metric-value { color: var(--cream); font-family: var(--sans); font-size: 20px; font-weight: 600; line-height: 1.05; }
+  .metric-sub { white-space: nowrap; color: var(--muted); font-family: var(--mono); font-size: 8px; }
+  .metric-sub b { color: var(--gold); font-family: var(--mono); font-size: 8.5px; font-weight: 600; }
+  .metric-foot { margin-top: 3px; color: var(--muted); font-family: var(--mono); font-size: 7px; letter-spacing: 0.075em; }
+  .capacity-track { width: 100%; height: 5px; margin-top: 7px; overflow: hidden; border-radius: 999px; background: rgba(244,245,237,0.13); }
+  .capacity-fill { width: 0; height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--gold), var(--sys-hi)); transition: width .22s ease; }
+  .device-counts {
+    display: flex; align-items: center; justify-content: flex-start; flex-wrap: wrap; gap: 7px;
+    margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(244,245,237,0.11);
+  }
+  .local-label { margin-right: 2px; color: var(--muted); font: 7px var(--mono); letter-spacing: 0.09em; }
+  .scan-count { padding: 4px 7px; border: 1px solid rgba(244,245,237,0.13); border-radius: 7px; background: rgba(244,245,237,0.04); color: var(--cream); font: 8px var(--mono); letter-spacing: 0.045em; }
+  .scan-count b { margin-left: 3px; font: 600 9px var(--sans); }
+  .count-ok b { color: var(--sys-hi); }
+  .count-dup b { color: var(--gold); }
+  .count-fail b { color: #F0A79E; }
+
+  #result { padding: 20px; }
+  #result.valid { background: radial-gradient(ellipse 110% 75% at 50% 20%, rgba(94,212,157,0.24), rgba(0,0,0,0) 60%), linear-gradient(155deg, #1F6B47 0%, #174B34 100%); }
+  #result.not_found, #result.invalid, #result.error { background: radial-gradient(ellipse 110% 75% at 50% 20%, rgba(244,245,237,0.08), rgba(0,0,0,0) 58%), linear-gradient(155deg, #703029 0%, #52241F 100%); }
+  #result.duplicate { background: radial-gradient(ellipse 110% 75% at 50% 20%, rgba(244,245,237,0.09), rgba(0,0,0,0) 58%), linear-gradient(155deg, #745725 0%, #4D3A1A 100%); }
+  #result .result-card {
+    width: min(100%,540px); padding: clamp(23px,5vw,38px); border: 1px solid rgba(244,245,237,0.32);
+    border-radius: 20px; background: rgba(7,25,17,0.28); box-shadow: 0 20px 46px rgba(0,0,0,0.24);
+  }
+  #result .icon { font-size: clamp(58px,12vw,76px); margin-bottom: 8px; }
+  #result .status-label { font-size: 13px; letter-spacing: 0.15em; margin-bottom: 12px; }
+  #result .guest-name { font-size: clamp(25px,6vw,32px); line-height: 1.2; }
+  #result .guest-detail { font-size: 12px; line-height: 1.5; overflow-wrap: anywhere; }
+  #result .dismiss-note { margin-top: 22px; font-size: 9px; }
+  #closed { padding: 20px; background: radial-gradient(ellipse 110% 65% at 50% 0%, rgba(51,193,127,0.08), rgba(0,0,0,0) 60%), #071D14; }
+  #closed .closed-card {
+    width: min(100%,480px); padding: clamp(24px,5vw,38px); border: 1px solid rgba(240,167,158,0.48);
+    border-radius: 19px; background: rgba(14,39,28,0.92); box-shadow: 0 18px 42px rgba(0,0,0,0.36);
+  }
+  #closed .big {
+    display: inline-flex; align-items: center; justify-content: center;
+    margin: 0 auto 16px; padding: 10px 16px; border: 1px solid rgba(240,167,158,0.9);
+    border-radius: 999px; background: rgba(141,61,52,0.32); color: #FFE0DC;
+    font-family: var(--sans); font-size: 15px; letter-spacing: 0.12em; line-height: 1.2;
+  }
+  #closed .small { max-width: 410px; margin: 0 auto; color: rgba(244,245,237,0.9); font-family: var(--mono); font-size: 11px; line-height: 1.7; }
+
+  @media (max-width: 620px) {
+    #app { padding-left: 13px; padding-right: 13px; }
+    header { align-items: stretch; flex-direction: column; gap: 9px; padding-top: 12px; }
+    .staff-tag { width: 100%; max-width: none; padding: 7px 10px; }
+    .staff-avatar { width: 28px; height: 28px; flex-basis: 28px; }
+    .ops-strip { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
+    .ops-chip { min-width: 0; min-height: 40px; padding: 7px 9px; }
+    .ops-sync { min-width: 0; justify-content: flex-start; font-size: 7.5px; }
+    #scanner-wrap { min-height: 215px; }
+    .camera-card { padding: 9px; border-radius: 14px; }
+    #reader { min-height: 190px; }
+    #reader video { max-height: 38vh; }
+    #reader__scan_region { min-height: 175px; }
+    .scan-hint { font-size: 8.5px; }
+    #stats { padding: 9px; }
+    .metric-grid { gap: 5px; }
+    .metric-card { padding: 7px 8px; }
+    .metric-main > b, .metric-value { font-size: 18px; }
+    .metric-sub { font-size: 7px; }
+    .metric-sub b { font-size: 7.5px; }
+  }
+  @media (max-width: 380px) {
+    .ops-chip { gap: 6px; padding-left: 7px; padding-right: 7px; }
+    .ops-state strong { font-size: 9px; }
+    .ops-sync { font-size: 7px; letter-spacing: 0; }
+    .stats-title { font-size: 12px; }
+    .metric-label { font-size: 7px; }
+    .metric-main > b, .metric-value { font-size: 17px; }
+    .metric-sub { font-size: 6.5px; }
+    .metric-sub b { font-size: 7px; }
+    .local-label { width: 100%; }
+    .row-btns { gap: 6px; }
+    .toggle-btn { padding-left: 7px; padding-right: 7px; font-size: 8.3px; }
+    #logout-btn { min-width: 82px; }
+  }
+  @media (max-height: 700px) {
+    header { padding-top: 8px; padding-bottom: 6px; }
+    .ops-strip { margin-bottom: 3px; }
+    #scanner-wrap { flex: 0 0 auto; min-height: 190px; padding: 2px 0 3px; }
+    .camera-card { padding: 8px; gap: 5px; }
+    #reader { min-height: 175px; }
+    #reader video { max-height: 30vh; }
+    #reader__scan_region { min-height: 160px; }
+    #stats { margin-top: 5px; padding: 7px 9px; }
+    .stats-heading { margin-bottom: 5px; }
+    .device-counts { margin-top: 6px; padding-top: 6px; }
+  }
+  @media (max-height: 700px) and (max-width: 620px) {
+    .staff-tag { padding: 6px 9px; }
+    .ops-chip { min-height: 36px; }
+    .metric-card { padding: 6px 7px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      scroll-behavior: auto !important;
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+</style>
 </head>
 <body>
 
@@ -234,14 +525,40 @@
 <!-- ---------- scanner app ---------- -->
 <div id="app">
   <header>
-    <div class="eyebrow">PSG · Door Check-In</div>
-    <h1>Student Council Public Hearing</h1>
-    <div class="staff-tag">Logged in as <b id="staff-name">—</b> · every scan is tagged to you</div>
+    <div class="brand-block">
+      <div class="eyebrow"><span class="brand-mark">PSG</span><span>DOOR CHECK-IN</span></div>
+      <h1>Student Council Public Hearing</h1>
+    </div>
+    <div class="staff-tag" aria-label="Signed in staff shift">
+      <span class="staff-avatar" aria-hidden="true">✓</span>
+      <span class="staff-copy">
+        <span class="shift-label">SHIFT ACTIVE</span>
+        <b id="staff-name">—</b>
+        <span class="staff-note">Every scan is tagged to you</span>
+      </span>
+    </div>
   </header>
 
+  <div class="ops-strip" aria-label="Check-in status and live statistics">
+    <div id="checkin-state" class="ops-chip ops-state unknown" role="status" aria-live="polite">
+      <span class="ops-led" aria-hidden="true"></span>
+      <span class="ops-copy"><span class="ops-caption">CHECK-IN</span><strong id="checkin-label">Checking status</strong></span>
+    </div>
+    <div id="stats-sync" class="ops-chip ops-sync sync-waiting" aria-label="Live statistics freshness">
+      <span class="sync-dot" aria-hidden="true"></span>
+      <span id="stats-sync-label">Waiting for live counts</span>
+    </div>
+  </div>
+
   <div id="scanner-wrap">
-    <div id="reader"></div>
-    <div class="scan-hint" id="scan-hint">Point camera at the attendee's ticket QR</div>
+    <div class="camera-card">
+      <div class="camera-card-head">
+        <span class="camera-label"><span class="camera-led" aria-hidden="true"></span>CAMERA SCANNER</span>
+        <span class="camera-mode">TICKET QR</span>
+      </div>
+      <div id="reader" aria-label="Live QR camera scanner"></div>
+      <div class="scan-hint" id="scan-hint">Point camera at the attendee's ticket QR</div>
+    </div>
   </div>
 
   <div class="scan-error" id="scan-error"></div>
@@ -257,31 +574,63 @@
   </div>
   <div id="lookup-results"></div>
 
-  <div id="stats">
-    <span>Registered: <b id="stat-reg">–</b></span>
-    <span>Checked in: <b id="stat-in">–</b></span>
-    <span>No-shows: <b id="stat-out">–</b></span>
-    <span>This device — OK: <b id="stat-valid">0</b> Dup: <b id="stat-dup">0</b> Fail: <b id="stat-bad">0</b></span>
-  </div>
+  <section id="stats" aria-label="Attendance summary" aria-live="off">
+    <div class="stats-heading">
+      <div>
+        <div class="stats-kicker">LIVE EVENT PULSE</div>
+        <div class="stats-title">Attendance</div>
+      </div>
+      <div class="device-tag"><span class="device-led" aria-hidden="true"></span>THIS DEVICE</div>
+    </div>
+    <div class="metric-grid">
+      <div class="metric-card metric-capacity">
+        <span class="metric-label">Registered</span>
+        <div class="metric-main"><b id="stat-reg">–</b><span class="metric-sub">cap <b id="stat-cap">–</b></span></div>
+        <div class="capacity-track" role="progressbar" aria-label="Registration capacity used" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-valuetext="Capacity information unavailable">
+          <div class="capacity-fill" id="capacity-fill"></div>
+        </div>
+      </div>
+      <div class="metric-card">
+        <span class="metric-label">Checked in</span>
+        <b class="metric-value" id="stat-in">–</b>
+        <span class="metric-foot">ATTENDEES</span>
+      </div>
+      <div class="metric-card">
+        <span class="metric-label">No-shows</span>
+        <b class="metric-value" id="stat-out">–</b>
+        <span class="metric-foot">NOT CHECKED IN</span>
+      </div>
+    </div>
+    <div class="device-counts" aria-label="Scan totals on this device">
+      <span class="local-label">LOCAL SCAN TOTALS</span>
+      <span class="scan-count count-ok">OK <b id="stat-valid">0</b></span>
+      <span class="scan-count count-dup">DUP <b id="stat-dup">0</b></span>
+      <span class="scan-count count-fail">FAIL <b id="stat-bad">0</b></span>
+    </div>
+  </section>
 </div>
 
 <!-- ---------- result overlay ---------- -->
 <div id="result">
-  <div class="icon" id="r-icon">—</div>
-  <div class="status-label" id="r-status">—</div>
-  <div class="guest-name" id="r-name">—</div>
-  <div class="guest-detail" id="r-council">—</div>
-  <div class="guest-detail" id="r-position"></div>
-  <div class="guest-detail" id="r-extra"></div>
-  <div class="dismiss-note">Tap anywhere to scan next attendee</div>
+  <div class="result-card">
+    <div class="icon" id="r-icon">—</div>
+    <div class="status-label" id="r-status">—</div>
+    <div class="guest-name" id="r-name">—</div>
+    <div class="guest-detail" id="r-council">—</div>
+    <div class="guest-detail" id="r-position"></div>
+    <div class="guest-detail" id="r-extra"></div>
+    <div class="dismiss-note">Tap anywhere to scan next attendee</div>
+  </div>
 </div>
 
 <!-- ---------- kill-switch closed screen ---------- -->
-<div id="closed">
-  <div class="big">Check-In Closed</div>
-  <div class="small">Check-in has been switched off by the admin console.<br>
-  The scanner will resume automatically when it is switched back on.<br><br>
-  Do NOT check anyone in manually on paper unless admin instructs it.</div>
+<div id="closed" role="alert" aria-live="assertive" aria-atomic="true">
+  <div class="closed-card">
+    <div class="big">Check-In Closed</div>
+    <div class="small">Check-in has been switched off by the admin console.<br>
+    The scanner will resume automatically when it is switched back on.<br><br>
+    Do NOT check anyone in manually on paper unless admin instructs it.</div>
+  </div>
 </div>
 
 <script>
@@ -290,6 +639,7 @@ const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyqBLqb3GVID6di
 let staffId = null, staffPin = null, staffName = null;
 const localStats = { valid: 0, dup: 0, bad: 0 };
 let busy = false, headcountTimer = null, closedShown = false;
+let statsLastUpdatedAt = 0, statsRequestFailed = false, statsFreshnessTimer = null;
 
 // All scanner calls carry the staff PIN — POST body, never a URL, so it
 // cannot leak via history/autocomplete/screen recordings/shared links.
@@ -340,6 +690,7 @@ function enterApp() {
   initCamera();
   refreshHeadcount();
   headcountTimer = setInterval(refreshHeadcount, 12000);
+  if (!statsFreshnessTimer) statsFreshnessTimer = setInterval(updateStatsFreshness, 5000);
 }
 
 // Resume a shift on page refresh (staff device stays with the staff member).
@@ -428,6 +779,7 @@ document.getElementById('result').addEventListener('click', function () {
 /* ---------- kill-switch screen ---------- */
 function showClosed() {
   closedShown = true;
+  setCheckinIndicator('closed', 'Check-in closed');
   document.getElementById('closed').classList.add('show');
   document.getElementById('result').classList.remove('show');
 }
@@ -436,17 +788,84 @@ function hideClosed() {
   document.getElementById('closed').classList.remove('show');
 }
 
+/* ---------- read-only scanner status presentation ---------- */
+function setCheckinIndicator(state, label) {
+  const el = document.getElementById('checkin-state');
+  const text = document.getElementById('checkin-label');
+  if (!el || !text) return;
+  el.classList.remove('open', 'closed', 'unknown');
+  el.classList.add(state);
+  if (text.textContent !== label) text.textContent = label;
+}
+
+function setStatsSync(state, label) {
+  const el = document.getElementById('stats-sync');
+  const text = document.getElementById('stats-sync-label');
+  if (!el || !text) return;
+  el.classList.remove('sync-live', 'sync-stale', 'sync-waiting');
+  el.classList.add('sync-' + state);
+  if (text.textContent !== label) text.textContent = label;
+}
+
+function updateStatsFreshness() {
+  if (!statsLastUpdatedAt) {
+    if (statsRequestFailed) setStatsSync('stale', 'Live counts unavailable · retrying');
+    else setStatsSync('waiting', 'Waiting for live counts');
+    return;
+  }
+  const age = Math.max(0, Math.floor((Date.now() - statsLastUpdatedAt) / 1000));
+  if (statsRequestFailed || age >= 30) {
+    setStatsSync('stale', 'Sync issue · last update ' + age + 's ago');
+  } else {
+    setStatsSync('live', age < 4 ? 'Live counts · updated just now' : 'Live counts · updated ' + age + 's ago');
+  }
+}
+
+function updateCapacityProgress(registered, capacity) {
+  const bar = document.getElementById('capacity-fill');
+  const track = bar && bar.parentElement;
+  if (!bar || !track) return;
+  const registeredCount = Number(String(registered).replace(/,/g, ''));
+  const capacityCount = Number(String(capacity).replace(/,/g, ''));
+  if (!Number.isFinite(registeredCount) || !Number.isFinite(capacityCount) || capacityCount <= 0) {
+    bar.style.width = '0%';
+    track.setAttribute('aria-valuenow', '0');
+    track.setAttribute('aria-valuetext', 'Capacity information unavailable');
+    return;
+  }
+  const percent = Math.max(0, Math.min(100, (registeredCount / capacityCount) * 100));
+  bar.style.width = percent.toFixed(1) + '%';
+  track.setAttribute('aria-valuenow', String(Math.round(percent)));
+  track.setAttribute('aria-valuetext', registeredCount + ' of ' + capacityCount + ' registrations');
+}
+
 /* ---------- live headcount + kill-switch polling ---------- */
 async function refreshHeadcount() {
   try {
     const d = await api(withAuth({ action: 'stats' }));
-    if (d.status !== 'ok') return;
-    document.getElementById('stat-reg').textContent = d.registered + ' / cap ' + d.capacity;
+    if (d.status !== 'ok') {
+      statsRequestFailed = true;
+      updateStatsFreshness();
+      return;
+    }
+    document.getElementById('stat-reg').textContent = d.registered;
+    document.getElementById('stat-cap').textContent = d.capacity;
     document.getElementById('stat-in').textContent = d.checkedIn;
     document.getElementById('stat-out').textContent = d.noShows;
+    updateCapacityProgress(d.registered, d.capacity);
+    statsLastUpdatedAt = Date.now();
+    statsRequestFailed = false;
+    updateStatsFreshness();
     if (d.settings && d.settings.checkInOn === false) showClosed();
-    else if (closedShown) hideClosed();
-  } catch (e) { /* transient */ }
+    else {
+      if (d.settings && typeof d.settings.checkInOn === 'boolean') setCheckinIndicator('open', 'Check-in open');
+      else setCheckinIndicator('unknown', 'Status unavailable');
+      if (closedShown) hideClosed();
+    }
+  } catch (e) {
+    statsRequestFailed = true;
+    updateStatsFreshness();
+  }
 }
 
 /* ---------- camera (CE Night init pattern, with hard error surfacing) ---------- */
@@ -532,5 +951,6 @@ async function doLookup() {
 document.getElementById('manual-submit').addEventListener('click', doLookup);
 document.getElementById('manual-q').addEventListener('keydown', function (e) { if (e.key === 'Enter') doLookup(); });
 </script>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a456d930daa4d11a',t:'MTc5MTE0NDgxOQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v31edd6df95cf4e85bb4c19e7a9bdbcba1788362987495" integrity="sha512-iIg7k2xntmwu6/uSb5tpc/hySgZc4eoL31yB29W6tJFo2akwjPWcEqnCEdJvGexCL0KEQwVYv5BlowfhVz26hg==" data-cf-beacon='{"version":"2024.11.0","token":"1954b47c125f43f8b4338b3c4f804e4f","spa":2}' crossorigin="anonymous"></script>
 </body>
 </html>
