@@ -37,7 +37,12 @@
       repeating-linear-gradient(115deg, rgba(244,245,237,0.02) 0 2px, transparent 2px 110px),
       linear-gradient(168deg, var(--sys-base) 0%, var(--sys-deepest) 72%);
     background-attachment: fixed;
+    animation: ambient-drift 78s linear infinite;
     min-height: 100vh;
+  }
+  @keyframes ambient-drift {
+    from { background-position: 0 0, 0 0, 0 0, 0 0; }
+    to   { background-position: 0 0, 0 0, 100px 46px, 0 0; }
   }
   .wrap { max-width: 900px; margin: 0 auto; padding: 26px 18px 60px; }
   h1 {
@@ -49,11 +54,30 @@
     text-transform: uppercase; color: var(--gold); margin: 6px 0 22px;
   }
   .card {
+    position: relative; isolation: isolate;
     background: linear-gradient(160deg, rgba(26,97,64,0.4), rgba(12,44,29,0.58));
-    border: 1.5px solid rgba(244,245,237,0.28); border-radius: 16px;
-    box-shadow: 0 14px 34px rgba(0,0,0,0.4), inset 0 2px 0 rgba(244,245,237,0.3);
+    -webkit-backdrop-filter: blur(8px) saturate(1.06);
+    backdrop-filter: blur(8px) saturate(1.06);
+    border: 1px solid rgba(244,245,237,0.38); border-radius: 16px;
+    box-shadow: 0 14px 34px rgba(0,0,0,0.4), inset 0 1px 0 rgba(244,245,237,0.34);
     padding: 18px; margin-bottom: 16px;
   }
+  .card::before {
+    content: ''; position: absolute; z-index: 0; pointer-events: none;
+    top: 0; left: 0; right: 0; height: 132px; border-radius: inherit;
+    background:
+      linear-gradient(90deg, rgba(244,245,237,0) 0%, rgba(244,245,237,0.34) 18%, rgba(244,245,237,0.16) 50%, rgba(244,245,237,0.3) 82%, rgba(244,245,237,0) 100%) top / 100% 1px no-repeat,
+      radial-gradient(ellipse 80% 100% at 50% 0%, rgba(51,193,127,0.12), rgba(51,193,127,0) 72%);
+  }
+  .card > * { position: relative; z-index: 1; }
+  #console:not(.console-ready) > .card { opacity: 0; transform: translateY(12px); }
+  #console.console-ready > .card { animation: card-rise .56s cubic-bezier(.2,.72,.25,1) both; }
+  #console.console-ready > .card:nth-child(1) { animation-delay: 0ms; }
+  #console.console-ready > .card:nth-child(2) { animation-delay: 70ms; }
+  #console.console-ready > .card:nth-child(3) { animation-delay: 140ms; }
+  #console.console-ready > .card:nth-child(4) { animation-delay: 210ms; }
+  #console.console-ready > .card:nth-child(5) { animation-delay: 280ms; }
+  @keyframes card-rise { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
   .card h2 {
     margin: 0 0 12px; font-family: var(--serif); font-weight: 600; font-size: 13px;
     letter-spacing: 0.18em; text-transform: uppercase; color: var(--cream);
@@ -62,6 +86,16 @@
   .switch-row:first-of-type { border-top: none; }
   .sw-label b { display: block; font-size: 14px; letter-spacing: 0.05em; font-weight: 600; text-transform: uppercase; }
   .sw-label span { font-family: var(--mono); font-size: 10px; color: rgba(244,245,237,0.55); }
+  .switch-row[data-key] .sw-label.has-switch-icon { display: flex; align-items: center; gap: 12px; }
+  .switch-row[data-key] .switch-icon {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 24px; height: 24px; flex: 0 0 24px; color: var(--gold); line-height: 0;
+  }
+  .switch-row[data-key] .switch-icon svg {
+    display: block; width: 24px; height: 24px; fill: none; stroke: currentColor;
+    stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round;
+  }
+  .switch-row[data-key] .switch-copy { display: block; }
   .state-pill {
     font-family: var(--sans); font-weight: 600; font-size: 11px;
     letter-spacing: 0.14em; text-transform: uppercase; padding: 5px 13px; border-radius: 20px;
@@ -69,6 +103,15 @@
   .state-pill.on { background: rgba(46,158,106,0.32); color: var(--sys-hi); }
   .state-pill.off { background: rgba(141,61,52,0.4); color: #F0A79E; }
   .state-pill.sched { background: rgba(147,110,47,0.4); color: var(--gold); }
+  .switch-row[data-key="checkInOn"] [data-pill].off {
+    border: 1px solid rgba(240,167,158,0.88);
+    box-shadow: 0 0 0 1px rgba(240,167,158,0.36), 0 0 12px rgba(240,167,158,0.28);
+    animation: kill-switch-pulse 2.6s ease-in-out infinite;
+  }
+  @keyframes kill-switch-pulse {
+    0%, 100% { box-shadow: 0 0 0 1px rgba(240,167,158,0.36), 0 0 9px rgba(240,167,158,0.18); }
+    50% { box-shadow: 0 0 0 1px rgba(240,167,158,0.84), 0 0 18px rgba(240,167,158,0.38); }
+  }
   .btn {
     background: var(--gold); border: none; color: var(--sys-deepest);
     font-family: var(--sans); font-weight: 600; font-size: 12px;
@@ -83,10 +126,78 @@
   }
   select option { color: #111; }
   .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-  @media (max-width: 640px) { .grid2 { grid-template-columns: 1fr; } }
+  @media (max-width: 640px) {
+    .grid2 { grid-template-columns: 1fr; }
+    /* Mid-range phones: keep the glass cue, reduce the filter's GPU footprint. */
+    .card { -webkit-backdrop-filter: blur(5px) saturate(1.03); backdrop-filter: blur(5px) saturate(1.03); }
+  }
   .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 8px; }
   .note { font-family: var(--mono); font-size: 10.5px; color: rgba(244,245,237,0.55); line-height: 1.7; margin-top: 10px; }
-  #msg { font-family: var(--mono); font-size: 11.5px; color: var(--sys-hi); min-height: 18px; margin: 8px 0; }
+  #msg {
+    max-width: 900px; max-height: 0; overflow: hidden; opacity: 0;
+    margin: 0 auto; padding: 0 14px; border: 1px solid transparent; border-radius: 10px;
+    transform: translateY(-8px); text-align: center;
+    font-family: var(--mono); font-size: 11px; line-height: 1.5; color: #9FE3BD;
+    transition: max-height .24s ease, opacity .22s ease, transform .22s ease,
+      padding .24s ease, margin .24s ease, border-color .24s ease;
+  }
+  #msg.show {
+    max-height: 100px; margin: 0 auto 14px; padding: 9px 14px;
+    border-color: rgba(94,212,157,0.42); background: rgba(12,44,29,0.94);
+    box-shadow: 0 10px 28px rgba(0,0,0,0.28); opacity: 1; transform: translateY(0);
+  }
+  #msg.bad { color: #FFE4E0; }
+  #msg.bad.show { border-color: rgba(240,167,158,0.62); background: rgba(59,23,21,0.96); }
+  .button-busy-content { display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
+  .spinner {
+    width: 13px; height: 13px; flex: 0 0 13px; display: inline-block;
+    border: 2px solid currentColor; border-top-color: transparent; border-radius: 50%;
+    animation: admin-spin .72s linear infinite;
+  }
+  @keyframes admin-spin { to { transform: rotate(360deg); } }
+  .btn:disabled { cursor: wait; }
+  select:disabled { color: var(--cream); opacity: 1; cursor: wait; }
+  .action-status {
+    display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;
+    font-family: var(--mono); font-size: 9px; letter-spacing: 0.06em; color: var(--cream);
+  }
+  .login-stage {
+    display: flex; align-items: center; justify-content: center; gap: 9px;
+    min-height: 42px; margin-top: 10px; padding: 10px 12px; border-radius: 10px;
+    border: 1px solid rgba(244,245,237,0.42); background: rgba(12,44,29,0.5);
+    -webkit-backdrop-filter: blur(6px) saturate(1.04);
+    backdrop-filter: blur(6px) saturate(1.04);
+    box-shadow: inset 0 1px 0 rgba(244,245,237,0.18);
+    color: rgba(244,245,237,0.88); font-family: var(--mono); font-size: 11px;
+    letter-spacing: 0.08em; text-align: center;
+  }
+  .login-stage.welcome { border-color: rgba(94,212,157,0.62); color: var(--sys-hi); }
+  .login-stage.welcome::before { content: '✓'; font-family: var(--sans); font-size: 18px; font-weight: 600; }
+  #login-card { transition: opacity .24s ease, transform .24s ease; }
+  #login-card.is-welcome #login-controls, #login-card.is-welcome #login-note { display: none; }
+  #login-card.is-leaving { opacity: 0; transform: translateY(-8px); pointer-events: none; }
+  .live-heading { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+  .live-indicator {
+    display: inline-flex; align-items: center; gap: 7px; white-space: nowrap;
+    font-family: var(--mono); font-size: 9px; font-weight: 400; letter-spacing: 0.08em;
+    color: rgba(244,245,237,0.62); text-transform: none;
+  }
+  .live-dot { width: 7px; height: 7px; flex: 0 0 7px; border-radius: 50%; background: var(--sys-hi); box-shadow: 0 0 9px rgba(94,212,157,0.58); }
+  .live-indicator.stale .live-dot { background: var(--gold); box-shadow: 0 0 8px rgba(219,190,102,0.42); }
+  .live-indicator.stale #live-updated { color: #F0A79E; }
+  .hidden { display: none !important; }
+
+  @media (prefers-reduced-motion: reduce) {
+    body { animation: none; }
+    #msg, #login-card { transition: none; transform: none; }
+    #login-card.is-leaving { transform: none; }
+    #console:not(.console-ready) > .card,
+    #console.console-ready > .card { opacity: 1; transform: none; animation: none; }
+    .spinner { animation: none; }
+    .switch-row[data-key="checkInOn"] [data-pill].off {
+      animation: none; box-shadow: 0 0 0 1px rgba(240,167,158,0.78), 0 0 14px rgba(240,167,158,0.3);
+    }
+  }
   table.data { width: 100%; border-collapse: collapse; font-size: 12px; }
   table.data th {
     font-family: var(--sans); font-weight: 600; font-size: 10px;
@@ -106,9 +217,13 @@
   .hidden { display: none !important; }
 
   @media print {
-    body { background: #fff; color: #000; }
+    body { background: #fff; color: #000; animation: none; }
     .no-print { display: none !important; }
     .card { border: none; background: none; box-shadow: none; padding: 0; }
+    .card::before { display: none; }
+    #msg { display: none !important; }
+    #console:not(.console-ready) > .card,
+    #console.console-ready > .card { opacity: 1; transform: none; animation: none; }
     table.data th { color: #000; border-color: #000; }
     table.data td { border-color: #999; }
   }
@@ -122,23 +237,26 @@
 
   <h1>Admin Console</h1>
   <div class="sub">Student Council Public Hearing · control switches · export</div>
+  <div id="msg" class="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 
   <div class="card" id="login-card">
-    <h2>Admin sign-in</h2>
-    <input type="password" id="pw" placeholder="Admin PIN (6+ letters &amp; digits, or VG backup PIN)" autocomplete="new-password" minlength="6">
-    <button class="btn" id="login-btn">Sign in</button>
-    <div id="msg"></div>
-    <div class="note">The admin credential is SEPARATE from the staff door PINs — the door staff cannot open this console or touch the kill switch. Every change here is logged with its actor and a Asia/Manila timestamp.</div>
+    <h2 id="login-title">Admin sign-in</h2>
+    <div id="login-controls">
+      <input type="password" id="pw" placeholder="Admin PIN (6+ letters &amp; digits, or VG backup PIN)" autocomplete="new-password" minlength="6">
+      <button class="btn" id="login-btn">Sign in</button>
+    </div>
+    <div id="login-stage" class="login-stage hidden" role="status" aria-live="polite" aria-atomic="true"></div>
+    <div class="note" id="login-note">The admin credential is SEPARATE from the staff door PINs — the door staff cannot open this console or touch the kill switch. Every change here is logged with its actor and a Asia/Manila timestamp.</div>
   </div>
 
   <div id="console" class="hidden">
 
-    <div class="card no-print">
-      <h2>Live counts</h2>
+    <div class="card no-print" id="live-counts-card">
+      <h2 class="live-heading"><span>Live counts</span><span id="live-indicator" class="live-indicator"><span class="live-dot" aria-hidden="true"></span><span id="live-updated">Waiting for first update</span></span></h2>
       <div class="counts">
-        <span>Registered: <b id="c-reg">–</b></span>
-        <span>Checked in: <b id="c-in">–</b></span>
-        <span>No-shows: <b id="c-out">–</b></span>
+        <span>Registered: <b id="c-reg"><span id="c-reg-count" data-count>–</span> / cap <span id="c-reg-cap">–</span></b></span>
+        <span>Checked in: <b id="c-in" data-count>–</b></span>
+        <span>No-shows: <b id="c-out" data-count>–</b></span>
         <span>Server time (PHT): <b id="c-time">–</b></span>
       </div>
     </div>
@@ -147,10 +265,14 @@
       <h2>Control switches (enforced server-side on every request)</h2>
 
       <div class="switch-row" data-key="registrationOpen">
-        <div class="sw-label"><b>Registration</b><span>Tally → ticket flow</span></div>
+        <div class="sw-label has-switch-icon">
+          <span class="switch-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 3.5h7l4 4v13h-11z"/><path d="M13.5 3.5v4h4"/><path d="M9 12h6M9 15.5h6M9 8.5h1"/></svg></span>
+          <div class="switch-copy"><b>Registration</b><span>Tally → ticket flow</span></div>
+        </div>
         <div class="row"><span class="state-pill off" data-pill>—</span>
           <button class="btn" data-flip>Toggle</button>
           <select data-mode><option value="manual">manual</option><option value="auto">auto window</option></select>
+          <span class="action-status hidden" data-action-status role="status" aria-live="polite"></span>
         </div>
         <div class="row sched hidden" data-sched>
           <input type="datetime-local" data-start> to <input type="datetime-local" data-end>
@@ -159,10 +281,14 @@
       </div>
 
       <div class="switch-row" data-key="checkInOn">
-        <div class="sw-label"><b>Check-in (KILL SWITCH)</b><span>off = scanners show "Check-in closed"</span></div>
+        <div class="sw-label has-switch-icon">
+          <span class="switch-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.2 19 6v5.2c0 4.5-2.7 7.7-7 9.6-4.3-1.9-7-5.1-7-9.6V6z"/><path d="m9.2 12.1 1.9 1.9 3.8-4"/></svg></span>
+          <div class="switch-copy"><b>Check-in (KILL SWITCH)</b><span>off = scanners show "Check-in closed"</span></div>
+        </div>
         <div class="row"><span class="state-pill off" data-pill>—</span>
           <button class="btn danger" data-flip>Toggle</button>
           <select data-mode><option value="manual">manual</option><option value="auto">auto window</option></select>
+          <span class="action-status hidden" data-action-status role="status" aria-live="polite"></span>
         </div>
         <div class="row sched hidden" data-sched>
           <input type="datetime-local" data-start> to <input type="datetime-local" data-end>
@@ -171,10 +297,14 @@
       </div>
 
       <div class="switch-row" data-key="agendaOn">
-        <div class="sw-label"><b>Agenda visibility</b><span>served only to registered ticket IDs</span></div>
+        <div class="sw-label has-switch-icon">
+          <span class="switch-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5.5" width="17" height="15" rx="2"/><path d="M7.5 3.5v4M16.5 3.5v4M3.5 9.5h17"/><path d="M8 13h2M14 13h2M8 16.5h2"/></svg></span>
+          <div class="switch-copy"><b>Agenda visibility</b><span>served only to registered ticket IDs</span></div>
+        </div>
         <div class="row"><span class="state-pill off" data-pill>—</span>
           <button class="btn" data-flip>Toggle</button>
           <select data-mode><option value="manual">manual</option><option value="auto">auto window</option></select>
+          <span class="action-status hidden" data-action-status role="status" aria-live="polite"></span>
         </div>
         <div class="row sched hidden" data-sched>
           <input type="datetime-local" data-start> to <input type="datetime-local" data-end>
@@ -222,52 +352,394 @@ let PIN = sessionStorage.getItem('psg.admin') || '';
 
 // Admin calls carry the admin/backup PIN — POST body only, never a URL.
 // text/plain keeps it a CORS "simple request" (no preflight).
-function api(params) {
-  return fetch(APPS_SCRIPT_URL, {
+function api(params, signal) {
+  const options = {
     method: 'POST',
     headers: { 'Content-Type': 'text/plain;charset=utf-8' },
     body: JSON.stringify(params)
-  }).then(function (r) { return r.json(); });
+  };
+  if (signal) options.signal = signal;
+  return fetch(APPS_SCRIPT_URL, options).then(function (r) { return r.json(); });
 }
+let toastTimer = null, toastSequence = 0;
 function msg(t, bad) {
   const m = document.getElementById('msg');
-  m.textContent = t || '';
-  m.style.color = bad ? '#ff9d9d' : '#9fe3bd';
+  const text = String(t || '');
+  if (toastTimer) clearTimeout(toastTimer);
+  const seq = ++toastSequence;
+  m.textContent = text;
+  m.classList.toggle('bad', !!bad);
+  if (!text) { m.classList.remove('show'); return; }
+  m.classList.add('show');
+  toastTimer = setTimeout(function () {
+    if (seq === toastSequence) m.classList.remove('show');
+  }, 4500);
+}
+
+function setButtonBusy(button, label) {
+  const wrap = document.createElement('span'); wrap.className = 'button-busy-content';
+  const spinner = document.createElement('span'); spinner.className = 'spinner'; spinner.setAttribute('aria-hidden', 'true');
+  const text = document.createElement('span'); text.textContent = label;
+  wrap.appendChild(spinner); wrap.appendChild(text);
+  button.replaceChildren(wrap);
+}
+
+const WRITE_ACTION_TIMEOUT_MS = 18000;
+const STALE_ACTION_TIMEOUT_MS = 45000;
+const WRITE_TIMEOUT_MESSAGE = 'No response — check your connection, then verify the switch state before retrying.';
+let actionSequence = 0;
+const activeActions = new Map();
+function writeTimeoutError() {
+  const e = new Error(WRITE_TIMEOUT_MESSAGE);
+  e.name = 'WriteTimeoutError'; e.code = 'WRITE_TIMEOUT';
+  return e;
+}
+function isWriteTimeout(e) {
+  return !!(e && (e.name === 'WriteTimeoutError' || e.code === 'WRITE_TIMEOUT'));
+}
+function restoreAction(action) {
+  if (!action || action.restored) return;
+  action.restored = true;
+  activeActions.delete(action.id);
+  const control = action.control;
+  if (control && control.dataset.actionId === action.id) {
+    if (action.isButton) {
+      control.innerHTML = action.oldHTML;
+      control.style.minWidth = action.oldMinWidth;
+    }
+    control.disabled = action.controlDisabled;
+    if (action.oldActionBusy === null) delete control.dataset.actionBusy;
+    else control.dataset.actionBusy = action.oldActionBusy;
+    if (action.oldAriaBusy === null) control.removeAttribute('aria-busy');
+    else control.setAttribute('aria-busy', action.oldAriaBusy);
+    delete control.dataset.actionId;
+  }
+  if (action.group && action.group.dataset.actionId === action.id) {
+    action.siblings.forEach(function (state) {
+      state.node.disabled = state.disabled;
+      if (state.ariaDisabled === null) state.node.removeAttribute('aria-disabled');
+      else state.node.setAttribute('aria-disabled', state.ariaDisabled);
+    });
+    delete action.group.dataset.actionBusy;
+    if (action.groupAriaBusy === null) action.group.removeAttribute('aria-busy');
+    else action.group.setAttribute('aria-busy', action.groupAriaBusy);
+    delete action.group.dataset.actionId;
+  }
+  if (action.feedback && action.feedback.dataset.actionId === action.id) {
+    action.feedback.innerHTML = action.feedbackHTML;
+    action.feedback.classList.toggle('hidden', action.feedbackWasHidden);
+    delete action.feedback.dataset.actionId;
+  }
+}
+function expireWriteAction(action) {
+  if (!action || action.timedOut || action.restored) return;
+  action.timedOut = true; action.expired = true; action.writePending = false;
+  const rejectTimeout = action.rejectWriteTimeout;
+  action.rejectWriteTimeout = null;
+  if (action.writeTimer) { clearTimeout(action.writeTimer); action.writeTimer = null; }
+  action.controllers.forEach(function (controller) { try { controller.abort(); } catch (e) {} });
+  action.controllers.clear();
+  if (typeof action.onTimeout === 'function' && !action.onTimeoutCalled) {
+    action.onTimeoutCalled = true;
+    try { action.onTimeout(action); } catch (e) {}
+  }
+  restoreAction(action);
+  msg(WRITE_TIMEOUT_MESSAGE, true);
+  if (!action.timeoutRefreshStarted) {
+    action.timeoutRefreshStarted = true;
+    setTimeout(function () { refresh(true); }, 0);
+  }
+  if (rejectTimeout) rejectTimeout(writeTimeoutError());
+}
+function recoverStaleAction(action) {
+  if (!action || action.expired || action.restored) return;
+  action.expired = true;
+  action.controllers.forEach(function (controller) { try { controller.abort(); } catch (e) {} });
+  action.controllers.clear();
+  if (typeof action.onStale === 'function') {
+    try { action.onStale(action); } catch (e) {}
+  }
+  restoreAction(action);
+  msg('No response — this request is still pending. Check your connection before trying again.', true);
+}
+function recoverStaleActions() {
+  const now = Date.now();
+  activeActions.forEach(function (action) {
+    if (action.isWriteAction && action.writeDeadline !== null && now >= action.writeDeadline) {
+      expireWriteAction(action);
+    } else if (now - action.startedAt >= STALE_ACTION_TIMEOUT_MS) {
+      if (action.isWriteAction) expireWriteAction(action);
+      else recoverStaleAction(action);
+    }
+  });
+}
+window.addEventListener('focus', function () { tickServerClock(); recoverStaleActions(); });
+document.addEventListener('visibilitychange', function () {
+  if (!document.hidden) { tickServerClock(); recoverStaleActions(); }
+});
+setInterval(recoverStaleActions, 1000);
+function apiWrite(params, action) {
+  if (!action) return Promise.reject(new Error('Write action context is missing.'));
+  action.isWriteAction = true;
+  if (action.expired || action.restored) return Promise.reject(writeTimeoutError());
+  const now = Date.now();
+  if (action.writeDeadline === null) action.writeDeadline = now + WRITE_ACTION_TIMEOUT_MS;
+  const remaining = action.writeDeadline - now;
+  if (remaining <= 0) {
+    expireWriteAction(action);
+    return Promise.reject(writeTimeoutError());
+  }
+  const controller = new AbortController();
+  action.controllers.add(controller); action.writePending = true;
+  const request = api(params, controller.signal).catch(function (e) {
+    if (action.timedOut || action.expired) throw writeTimeoutError();
+    throw e;
+  });
+  const timeout = new Promise(function (resolve, reject) {
+    action.rejectWriteTimeout = reject;
+    action.writeTimer = setTimeout(function () { expireWriteAction(action); }, remaining);
+  });
+  return Promise.race([request, timeout]).finally(function () {
+    if (action.writeTimer) { clearTimeout(action.writeTimer); action.writeTimer = null; }
+    action.rejectWriteTimeout = null;
+    action.controllers.delete(controller);
+    action.writePending = false;
+  });
+}
+function runAction(control, label, work, feedback, group, options) {
+  if (!control || control.disabled || control.dataset.actionBusy === 'true' || (group && group.dataset.actionBusy === 'true')) return Promise.resolve(false);
+  options = options || {};
+  const isButton = control.tagName === 'BUTTON';
+  const action = {
+    id: 'admin-action-' + (++actionSequence), control: control, group: group || null, feedback: feedback || null,
+    isButton: isButton, controlDisabled: control.disabled, oldHTML: isButton ? control.innerHTML : '',
+    oldMinWidth: control.style.minWidth, oldActionBusy: control.dataset.actionBusy || null,
+    oldAriaBusy: control.getAttribute('aria-busy'), groupAriaBusy: group ? group.getAttribute('aria-busy') : null,
+    feedbackHTML: feedback ? feedback.innerHTML : '', feedbackWasHidden: feedback ? feedback.classList.contains('hidden') : true,
+    siblings: [], startedAt: Date.now(), writeDeadline: null, writePending: false,
+    isWriteAction: !!options.writeAction, expired: false, timedOut: false, restored: false,
+    timeoutRefreshStarted: false, controllers: new Set(), onTimeout: options.onTimeout || null,
+    onStale: options.onStale || null, onTimeoutCalled: false, writeTimer: null, rejectWriteTimeout: null
+  };
+  activeActions.set(action.id, action);
+  control.dataset.actionId = action.id;
+  if (group) {
+    group.dataset.actionBusy = 'true'; group.dataset.actionId = action.id; group.setAttribute('aria-busy', 'true');
+    action.siblings = Array.from(group.querySelectorAll('[data-flip], [data-mode], [data-savesched], [data-start], [data-end]'))
+      .filter(function (node) { return node !== control; }).map(function (node) {
+        const state = { node: node, disabled: node.disabled, ariaDisabled: node.getAttribute('aria-disabled') };
+        node.disabled = true; node.setAttribute('aria-disabled', 'true');
+        return state;
+      });
+  }
+  if (isButton) control.style.minWidth = Math.ceil(Math.max(1, control.getBoundingClientRect().width)) + 'px';
+  control.dataset.actionBusy = 'true'; control.disabled = true; control.setAttribute('aria-busy', 'true');
+  if (isButton) setButtonBusy(control, label);
+  else if (feedback) {
+    feedback.dataset.actionId = action.id;
+    const spinner = document.createElement('span'); spinner.className = 'spinner'; spinner.setAttribute('aria-hidden', 'true');
+    const text = document.createElement('span'); text.textContent = label;
+    feedback.replaceChildren(spinner, text); feedback.classList.remove('hidden');
+  }
+  let task;
+  try { task = work(action); } catch (e) { task = Promise.reject(e); }
+  return Promise.resolve(task).finally(function () { restoreAction(action); });
 }
 
 /* ---------- login ---------- */
-async function login() {
+let loginInFlight = false, loginAttemptSequence = 0;
+function setLoginStage(text, kind) {
+  const stage = document.getElementById('login-stage');
+  stage.textContent = text || '';
+  stage.classList.toggle('hidden', !text);
+  stage.classList.toggle('welcome', kind === 'welcome');
+}
+function wait(ms) { return new Promise(function (resolve) { setTimeout(resolve, ms); }); }
+function revealConsole() {
+  const panel = document.getElementById('console');
+  panel.classList.add('console-ready');
+  panel.classList.remove('hidden');
+}
+function abandonLoginAttempt() {
+  loginAttemptSequence++;
+  loginInFlight = false;
+  const card = document.getElementById('login-card');
+  card.classList.remove('is-welcome', 'is-leaving');
+  document.getElementById('pw').disabled = false;
+  setLoginStage('', '');
+}
+async function login(flow, action) {
+  if (loginInFlight) return false;
+  loginInFlight = true;
+  const attempt = ++loginAttemptSequence;
+  const fresh = flow === 'fresh';
+  const card = document.getElementById('login-card');
+  const password = document.getElementById('pw');
+  card.classList.remove('is-welcome', 'is-leaving');
+  password.disabled = true;
+  setLoginStage(fresh ? 'Verifying your PIN…' : 'Restoring your session…', fresh ? 'verifying' : 'resuming');
   try {
+    // This single state response both verifies the PIN and populates the console.
     const d = await api({ action: 'admin', op: 'state', pin: PIN });
+    if ((action && action.expired) || attempt !== loginAttemptSequence) return false;
     if (d.status === 'ok') {
       sessionStorage.setItem('psg.admin', PIN);
-      document.getElementById('login-card').classList.add('hidden');
-      document.getElementById('console').classList.remove('hidden');
       renderState(d);
-    } else if (d.status === 'locked') {
-      msg('Admin console locked after repeated wrong PINs. Wait ~20 minutes.', true);
-    } else {
-      msg('Wrong PIN. ' + (d.failsLeft != null ? d.failsLeft + ' attempt(s) left.' : ''), true);
+      msg('', false);
+      if (fresh) {
+        setLoginStage('Welcome. Your admin console is ready.', 'welcome');
+        card.classList.add('is-welcome');
+        await wait(720);
+        if ((action && action.expired) || attempt !== loginAttemptSequence) return false;
+        card.classList.add('is-leaving');
+        revealConsole();
+        await wait(240);
+        if ((action && action.expired) || attempt !== loginAttemptSequence) return false;
+        card.classList.add('hidden');
+        card.classList.remove('is-leaving', 'is-welcome');
+        setLoginStage('', '');
+      } else {
+        setLoginStage('', '');
+        card.classList.add('hidden');
+        revealConsole();
+      }
+      startLivePolling();
+      return true;
     }
-  } catch (e) { msg('Could not reach server.', true); }
+    card.classList.remove('is-welcome', 'is-leaving');
+    setLoginStage('', '');
+    if (d.status === 'locked') msg('Admin console locked after repeated wrong PINs. Wait ~20 minutes.', true);
+    else if (d.status === 'bad_pin') msg('Wrong PIN. ' + (d.failsLeft != null ? d.failsLeft + ' attempt(s) left.' : ''), true);
+    else msg('Could not load admin state. Please try again.', true);
+  } catch (e) {
+    if (action && action.expired) return false;
+    card.classList.remove('is-welcome', 'is-leaving');
+    setLoginStage('', '');
+    msg('Could not reach server.', true);
+  } finally {
+    if (attempt === loginAttemptSequence) {
+      loginInFlight = false;
+      password.disabled = false;
+    }
+  }
+  return false;
 }
-document.getElementById('login-btn').addEventListener('click', function () {
+function submitLogin() {
+  if (loginInFlight) return;
   PIN = document.getElementById('pw').value.trim();
-  if (PIN && PIN.length >= 6) login();
-  else msg('PINs are 6+ characters (letters & digits).', true);
-});
+  if (!PIN || PIN.length < 6) { msg('PINs are 6+ characters (letters & digits).', true); return; }
+  runAction(document.getElementById('login-btn'), 'Verifying…', function (action) { return login('fresh', action); }, null, null, { onStale: abandonLoginAttempt })
+    .catch(function () { msg('Could not complete sign-in.', true); });
+}
+document.getElementById('login-btn').addEventListener('click', submitLogin);
 document.getElementById('pw').addEventListener('keydown', function (e) { if (e.key === 'Enter') document.getElementById('login-btn').click(); });
-if (PIN) login();
+if (PIN) {
+  runAction(document.getElementById('login-btn'), 'Restoring…', function (action) { return login('resume', action); }, null, null, { onStale: abandonLoginAttempt })
+    .catch(function () { msg('Could not restore the admin session.', true); });
+}
 
 /* ---------- state rendering ---------- */
 let exportData = null;
+const unlockInFlight = new Set();
+const countAnimations = new WeakMap();
+let lastStateUpdated = 0, statePollFailed = false;
+function prefersReducedMotion() {
+  return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+}
+let serverClockEpochMs = null, serverClockAnchorPerfMs = null;
+let phtFormatter = null;
+try {
+  phtFormatter = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Manila', year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23'
+  });
+} catch (e) {}
+function parseServerTimePHT(value) {
+  const m = String(value || '').match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2}):(\d{2})$/);
+  if (!m) return NaN;
+  const parts = m.slice(1).map(Number);
+  const localAsUtc = Date.UTC(parts[0], parts[1] - 1, parts[2], parts[3], parts[4], parts[5]);
+  const verify = new Date(localAsUtc);
+  if (verify.getUTCFullYear() !== parts[0] || verify.getUTCMonth() !== parts[1] - 1 ||
+      verify.getUTCDate() !== parts[2] || parts[3] > 23 || parts[4] > 59 || parts[5] > 59) return NaN;
+  return localAsUtc - 8 * 60 * 60 * 1000; // Asia/Manila is UTC+8 year-round.
+}
+function formatServerTimePHT(epochMs) {
+  let values = {};
+  if (phtFormatter) {
+    phtFormatter.formatToParts(new Date(epochMs)).forEach(function (part) { values[part.type] = part.value; });
+  } else {
+    const d = new Date(epochMs + 8 * 60 * 60 * 1000);
+    function pad(n) { return String(n).padStart(2, '0'); }
+    values = { year: String(d.getUTCFullYear()), month: pad(d.getUTCMonth() + 1), day: pad(d.getUTCDate()),
+      hour: pad(d.getUTCHours()), minute: pad(d.getUTCMinutes()), second: pad(d.getUTCSeconds()) };
+  }
+  return values.year + '-' + values.month + '-' + values.day + ' ' + values.hour + ':' + values.minute + ':' + values.second;
+}
+function tickServerClock() {
+  if (!Number.isFinite(serverClockEpochMs) || !Number.isFinite(serverClockAnchorPerfMs)) return;
+  const now = serverClockEpochMs + (performance.now() - serverClockAnchorPerfMs);
+  document.getElementById('c-time').textContent = formatServerTimePHT(now);
+}
+function syncServerClock(serverTime) {
+  const baseline = parseServerTimePHT(serverTime);
+  if (!Number.isFinite(baseline)) {
+    document.getElementById('c-time').textContent = String(serverTime || '—');
+    return;
+  }
+  serverClockEpochMs = baseline;
+  serverClockAnchorPerfMs = performance.now();
+  tickServerClock();
+}
+function animateCount(node, value) {
+  const target = Math.max(0, Math.round(Number(value) || 0));
+  const previous = countAnimations.get(node);
+  if (previous && previous.frame) cancelAnimationFrame(previous.frame);
+  const current = Number(String(node.textContent).trim());
+  if (!Number.isFinite(current) || current === target || prefersReducedMotion()) {
+    node.textContent = String(target);
+    countAnimations.set(node, { target: target, frame: 0 });
+    return;
+  }
+  let started = null;
+  const from = current;
+  const state = { target: target, frame: 0 };
+  countAnimations.set(node, state);
+  function step(ts) {
+    if (countAnimations.get(node) !== state) return;
+    if (started === null) started = ts;
+    const progress = Math.min(1, (ts - started) / 550);
+    const eased = 1 - Math.pow(1 - progress, 3);
+    node.textContent = String(Math.round(from + (target - from) * eased));
+    if (progress < 1) state.frame = requestAnimationFrame(step);
+    else { node.textContent = String(target); state.frame = 0; }
+  }
+  state.frame = requestAnimationFrame(step);
+}
+function updateLiveAge() {
+  tickServerClock();
+  const indicator = document.getElementById('live-indicator');
+  const text = document.getElementById('live-updated');
+  if (!indicator || !text) return;
+  indicator.classList.toggle('stale', statePollFailed);
+  if (!lastStateUpdated) { text.textContent = 'Waiting for first update'; return; }
+  const age = Math.max(0, Math.floor((Date.now() - lastStateUpdated) / 1000));
+  text.textContent = statePollFailed ? 'Connection issue · updated ' + age + 's ago' : 'Updated ' + age + 's ago';
+}
 
-function renderState(d) {
-  document.getElementById('c-reg').textContent = d.registered + ' / cap ' + d.settings.regCapacity;
-  document.getElementById('c-in').textContent = d.checkedIn;
-  document.getElementById('c-out').textContent = d.noShows;
-  document.getElementById('c-time').textContent = d.serverTime;
-  document.getElementById('cap').value = d.settings.regCapacity;
+function renderState(d, options) {
+  const forceSettings = !!(options && options.forceSettings);
+  animateCount(document.getElementById('c-reg-count'), d.registered);
+  document.getElementById('c-reg-cap').textContent = d.settings.regCapacity;
+  animateCount(document.getElementById('c-in'), d.checkedIn);
+  animateCount(document.getElementById('c-out'), d.noShows);
+  syncServerClock(d.serverTime);
+  lastStateUpdated = Date.now(); statePollFailed = false; updateLiveAge();
+  const capInput = document.getElementById('cap');
+  if (!capInput.disabled && (forceSettings || (document.activeElement !== capInput && capInput.dataset.dirty !== 'true'))) {
+    capInput.value = d.settings.regCapacity;
+    if (forceSettings) delete capInput.dataset.dirty;
+  }
 
   document.querySelectorAll('.switch-row[data-key]').forEach(function (row) {
     const key = row.getAttribute('data-key');
@@ -278,11 +750,21 @@ function renderState(d) {
     pill.className = 'state-pill ' + (eff ? 'on' : 'off') + (mode === 'auto' ? ' sched' : '');
     if (mode === 'auto') pill.textContent += ' · AUTO';
     const modeSel = row.querySelector('[data-mode]');
-    modeSel.value = mode;
+    if (!modeSel.disabled && (forceSettings || document.activeElement !== modeSel)) {
+      modeSel.value = mode;
+      modeSel.dataset.confirmedMode = mode;
+    }
     const sched = row.querySelector('[data-sched]');
     sched.classList.toggle('hidden', mode !== 'auto');
-    sched.querySelector('[data-start]').value = d.settings[key + 'Start'] || '';
-    sched.querySelector('[data-end]').value = d.settings[key + 'End'] || '';
+    const startInput = sched.querySelector('[data-start]');
+    const endInput = sched.querySelector('[data-end]');
+    if (!startInput.disabled && !endInput.disabled && (forceSettings || (
+        document.activeElement !== startInput && document.activeElement !== endInput &&
+        startInput.dataset.dirty !== 'true' && endInput.dataset.dirty !== 'true'))) {
+      startInput.value = d.settings[key + 'Start'] || '';
+      endInput.value = d.settings[key + 'End'] || '';
+      if (forceSettings) { delete startInput.dataset.dirty; delete endInput.dataset.dirty; }
+    }
   });
 
   const sb = document.getElementById('staff-box');
@@ -299,81 +781,188 @@ function renderState(d) {
     if (s.lockedUntil || s.fails > 0) {
       const btn = document.createElement('button');
       btn.className = 'btn ghost'; btn.textContent = 'Unlock / reset';
-      btn.addEventListener('click', function () { unlockStaff(s.staffId); });
+      if (unlockInFlight.has(String(s.staffId))) {
+        btn.disabled = true; btn.dataset.actionBusy = 'true'; btn.setAttribute('aria-busy', 'true');
+        btn.style.minWidth = '112px'; setButtonBusy(btn, 'Unlocking…');
+      }
+      btn.addEventListener('click', function () { unlockStaff(s.staffId, btn); });
       row.appendChild(btn);
     }
     sb.appendChild(row);
   });
 }
 
-async function refresh() {
-  try { renderState(await api({ action: 'admin', op: 'state', pin: PIN })); } catch (e) {}
+let refreshInFlight = false, refreshQueued = false, refreshForceQueued = false, pollTimer = null, ageTimer = null;
+async function refresh(forceSettings) {
+  if (!PIN || document.getElementById('console').classList.contains('hidden')) return null;
+  if (refreshInFlight) {
+    refreshQueued = true;
+    if (forceSettings) refreshForceQueued = true;
+    return null;
+  }
+  refreshInFlight = true;
+  try {
+    const d = await api({ action: 'admin', op: 'state', pin: PIN });
+    if (d.status === 'ok') renderState(d, { forceSettings: !!forceSettings });
+    else { statePollFailed = true; updateLiveAge(); }
+  } catch (e) { statePollFailed = true; updateLiveAge(); }
+  finally {
+    refreshInFlight = false;
+    if (refreshQueued) {
+      const queuedForce = refreshForceQueued;
+      refreshQueued = false; refreshForceQueued = false;
+      await refresh(queuedForce);
+    }
+  }
+}
+function startLivePolling() {
+  if (pollTimer) return;
+  updateLiveAge();
+  pollTimer = setInterval(refresh, 12000);
+  ageTimer = setInterval(updateLiveAge, 1000);
 }
 
 /* ---------- switch actions ---------- */
-async function setKey(key, value) {
-  const d = await api({ action: 'admin', op: 'set', key: key, value: value, pin: PIN });
+async function setKey(key, value, action) {
+  const d = await apiWrite({ action: 'admin', op: 'set', key: key, value: value, pin: PIN }, action);
+  if (action.expired) throw writeTimeoutError();
   if (d.status !== 'ok') throw new Error(d.message || d.status);
+}
+function refreshAfterWrite(action) {
+  if (!action.timedOut && !action.expired) refresh();
 }
 
 document.querySelectorAll('.switch-row[data-key]').forEach(function (row) {
   const key = row.getAttribute('data-key');
-  row.querySelector('[data-flip]').addEventListener('click', async function () {
-    try {
-      const cur = await api({ action: 'admin', op: 'state', pin: PIN });
-      const next = !(cur.effective[key] === true);
-      await setKey(key + 'Mode', 'manual');           // manual override on top
-      await setKey(key, next ? 'true' : 'false');
-      msg(key + ' -> ' + (next ? 'ON' : 'OFF') + ' (manual). Logged.');
-      refresh();
-    } catch (e) { msg('Failed: ' + e.message, true); }
+  const flipButton = row.querySelector('[data-flip]');
+  flipButton.addEventListener('click', function () {
+    runAction(flipButton, 'Updating…', async function (action) {
+      try {
+        // The state lookup stays read-only and untimed; a stale action is barred from writing later.
+        const cur = await api({ action: 'admin', op: 'state', pin: PIN });
+        if (action.expired) return;
+        const next = !(cur.effective[key] === true);
+        await setKey(key + 'Mode', 'manual', action);
+        if (action.expired) return;
+        const modeSelect = row.querySelector('[data-mode]');
+        modeSelect.value = 'manual'; modeSelect.dataset.confirmedMode = 'manual';
+        await setKey(key, next ? 'true' : 'false', action);
+        if (action.expired) return;
+        msg(key + ' -> ' + (next ? 'ON' : 'OFF') + ' (manual). Logged.');
+      } catch (e) {
+        if (!isWriteTimeout(e)) msg('Failed: ' + e.message, true);
+      } finally { refreshAfterWrite(action); }
+    }, null, row, { writeAction: true });
   });
-  row.querySelector('[data-mode]').addEventListener('change', async function (e) {
-    try {
-      await setKey(key + 'Mode', e.target.value);
-      msg(key + ' mode -> ' + e.target.value + '. Logged.');
-      refresh();
-    } catch (err) { msg('Failed: ' + err.message, true); }
+  const modeSelect = row.querySelector('[data-mode]');
+  modeSelect.addEventListener('change', function (e) {
+    const select = e.currentTarget;
+    const value = select.value;
+    const previous = select.dataset.confirmedMode || 'manual';
+    const feedback = row.querySelector('[data-action-status]');
+    runAction(select, 'Saving…', async function (action) {
+      try {
+        await setKey(key + 'Mode', value, action);
+        if (action.expired) return;
+        select.dataset.confirmedMode = value;
+        msg(key + ' mode -> ' + value + '. Logged.');
+      } catch (err) {
+        if (!isWriteTimeout(err)) {
+          select.value = previous;
+          msg('Failed: ' + err.message, true);
+        }
+      } finally { refreshAfterWrite(action); }
+    }, feedback, row, { writeAction: true });
   });
-  row.querySelector('[data-savesched]').addEventListener('click', async function () {
+  const windowButton = row.querySelector('[data-savesched]');
+  windowButton.addEventListener('click', function () {
     const s = row.querySelector('[data-start]').value;
     const en = row.querySelector('[data-end]').value;
-    try {
-      await setKey(key + 'Start', s || '');
-      await setKey(key + 'End', en || '');
-      msg(key + ' window set (' + (s || 'open start') + ' → ' + (en || 'no end') + '). Logged.');
-      refresh();
-    } catch (e2) { msg('Failed: ' + e2.message, true); }
+    runAction(windowButton, 'Saving…', async function (action) {
+      try {
+        await setKey(key + 'Start', s || '', action);
+        if (action.expired) return;
+        await setKey(key + 'End', en || '', action);
+        if (action.expired) return;
+        delete row.querySelector('[data-start]').dataset.dirty;
+        delete row.querySelector('[data-end]').dataset.dirty;
+        msg(key + ' window set (' + (s || 'open start') + ' → ' + (en || 'no end') + '). Logged.');
+      } catch (e2) {
+        if (!isWriteTimeout(e2)) msg('Failed: ' + e2.message, true);
+      } finally { refreshAfterWrite(action); }
+    }, null, row, { writeAction: true });
   });
 });
 
-document.getElementById('cap-save').addEventListener('click', async function () {
-  try {
-    await setKey('regCapacity', document.getElementById('cap').value);
-    msg('Capacity saved. Logged.');
-    refresh();
-  } catch (e) { msg('Failed: ' + e.message, true); }
+document.getElementById('cap-save').addEventListener('click', function () {
+  const button = document.getElementById('cap-save');
+  const capInput = document.getElementById('cap');
+  const value = capInput.value;
+  const wasDisabled = capInput.disabled;
+  runAction(button, 'Saving…', async function (action) {
+    capInput.disabled = true;
+    try {
+      await setKey('regCapacity', value, action);
+      if (action.expired) return;
+      delete capInput.dataset.dirty;
+      msg('Capacity saved. Logged.');
+    } catch (e) {
+      if (!isWriteTimeout(e)) msg('Failed: ' + e.message, true);
+    } finally {
+      capInput.disabled = wasDisabled;
+      refreshAfterWrite(action);
+    }
+  }, null, null, { writeAction: true, onTimeout: function () { capInput.disabled = wasDisabled; } });
 });
 
-async function unlockStaff(staffId) {
-  try {
-    const d = await api({ action: 'admin', op: 'unlock', staffId: staffId, pin: PIN });
-    if (d.status === 'ok') { msg(staffId + ' unlocked. Logged.'); refresh(); }
-    else msg('Failed: ' + (d.message || d.status), true);
-  } catch (e) { msg('Failed.', true); }
+document.getElementById('cap').addEventListener('input', function () { this.dataset.dirty = 'true'; });
+document.querySelectorAll('.switch-row[data-key] [data-start], .switch-row[data-key] [data-end]').forEach(function (input) {
+  ['input', 'change'].forEach(function (type) {
+    input.addEventListener(type, function () { input.dataset.dirty = 'true'; });
+  });
+});
+
+function unlockStaff(staffId, button) {
+  const id = String(staffId);
+  if (unlockInFlight.has(id)) return Promise.resolve(false);
+  unlockInFlight.add(id);
+  return runAction(button, 'Unlocking…', async function (action) {
+    try {
+      const d = await apiWrite({ action: 'admin', op: 'unlock', staffId: staffId, pin: PIN }, action);
+      if (action.expired) return;
+      if (d.status === 'ok') msg(staffId + ' unlocked. Logged.');
+      else msg('Failed: ' + (d.message || d.status), true);
+    } catch (e) {
+      if (!isWriteTimeout(e)) msg('Failed.', true);
+    } finally {
+      unlockInFlight.delete(id);
+      refreshAfterWrite(action);
+    }
+  }, null, null, { writeAction: true, onTimeout: function () { unlockInFlight.delete(id); } });
 }
 
 /* ---------- export / CSV / print ---------- */
-document.getElementById('load-export').addEventListener('click', async function () {
+const loadExportButton = document.getElementById('load-export');
+loadExportButton.addEventListener('click', function () {
   const box = document.getElementById('export-box');
   box.innerHTML = '<p class="note">Loading…</p>';
-  try {
-    exportData = await api({ action: 'admin', op: 'export', pin: PIN });
-    if (exportData.status !== 'ok') { box.innerHTML = '<p class="note">Export failed.</p>'; return; }
-    renderExport();
-    document.getElementById('csv-btn').classList.remove('hidden');
-    document.getElementById('print-btn').classList.remove('hidden');
-  } catch (e) { box.innerHTML = '<p class="note">Export failed — connection.</p>'; }
+  runAction(loadExportButton, 'Loading…', async function (action) {
+    try {
+      exportData = await api({ action: 'admin', op: 'export', pin: PIN });
+      if (action.expired) return;
+      if (exportData.status !== 'ok') {
+        box.innerHTML = '<p class="note">Export failed.</p>';
+        msg('Could not load export data.', true); return;
+      }
+      renderExport();
+      document.getElementById('csv-btn').classList.remove('hidden');
+      document.getElementById('print-btn').classList.remove('hidden');
+      msg('Export data loaded.');
+    } catch (e) {
+      box.innerHTML = '<p class="note">Export failed — connection.</p>';
+      msg('Could not load export data.', true);
+    }
+  });
 });
 
 function renderExport() {
@@ -604,26 +1193,28 @@ async function buildMasterWorkbook(data) {
   return wb.xlsx.writeBuffer();
 }
 
-document.getElementById('csv-btn').addEventListener('click', async function () {
+const workbookButton = document.getElementById('csv-btn');
+workbookButton.addEventListener('click', function () {
   if (!exportData) return;
   if (!window.ExcelJS) { alert('Workbook engine failed to load — check connection and reload the console.'); return; }
-  const btn = document.getElementById('csv-btn');
-  const orig = btn.textContent;
-  btn.disabled = true; btn.textContent = 'Building workbook…';
-  try {
+  runAction(workbookButton, 'Building workbook…', async function (action) {
     const buf = await buildMasterWorkbook(exportData);
+    if (action.expired) return;
     const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
     a.download = 'paskuhan2026-master-list-' + exportData.generatedAt.replace(/[: ]/g, '-') + '.xlsx';
     a.click();
     URL.revokeObjectURL(a.href);
-  } finally {
-    btn.disabled = false; btn.textContent = orig;
-  }
+    msg('Workbook generated.');
+  }).catch(function () { msg('Could not build workbook.', true); });
 });
 
-document.getElementById('print-btn').addEventListener('click', function () { window.print(); });
+document.getElementById('print-btn').addEventListener('click', function () {
+  const button = document.getElementById('print-btn');
+  runAction(button, 'Preparing print…', function () { window.print(); msg('Opening print dialog.'); });
+});
 </script>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a4562669fe86383f',t:'MTc5MTEzNzQ5Ng=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v31edd6df95cf4e85bb4c19e7a9bdbcba1788362987495" integrity="sha512-iIg7k2xntmwu6/uSb5tpc/hySgZc4eoL31yB29W6tJFo2akwjPWcEqnCEdJvGexCL0KEQwVYv5BlowfhVz26hg==" data-cf-beacon='{"version":"2024.11.0","token":"1954b47c125f43f8b4338b3c4f804e4f","spa":2}' crossorigin="anonymous"></script>
 </body>
 </html>
