@@ -340,6 +340,11 @@
     position: static; inset: auto; padding: 1px 2px 0; color: var(--muted); text-align: center;
     font-family: var(--mono); font-size: 9px; letter-spacing: 0.035em; line-height: 1.45; text-transform: none;
   }
+  #reader.scan-detected {
+    border-color: rgba(94,212,157,0.92);
+    box-shadow: 0 0 0 2px rgba(94,212,157,0.42), 0 0 18px rgba(94,212,157,0.16);
+  }
+  .scan-hint.scan-detected { color: #BFEBD2; font-weight: 600; }
   .scan-error {
     width: min(100%,560px); margin: 0 auto 5px; padding: 10px 12px;
     border: 1px solid rgba(240,167,158,0.54); background: rgba(77,30,27,0.72);
@@ -557,7 +562,7 @@
         <span class="camera-mode">TICKET QR</span>
       </div>
       <div id="reader" aria-label="Live QR camera scanner"></div>
-      <div class="scan-hint" id="scan-hint">Point camera at the attendee's ticket QR</div>
+      <div class="scan-hint" id="scan-hint" role="status" aria-live="polite" aria-atomic="true">Center the full QR inside the square; enlarge the ticket QR on small screens.</div>
     </div>
   </div>
 
@@ -767,12 +772,14 @@ function scheduleAutoDismiss() {
   setTimeout(function () {
     if (gen !== dismissGen) return;
     document.getElementById('result').classList.remove('show');
+    clearScanFeedback();
     busy = false;
   }, 4500);
 }
 document.getElementById('result').addEventListener('click', function () {
   dismissGen++;
   document.getElementById('result').classList.remove('show');
+  clearScanFeedback();
   busy = false;
 });
 
@@ -786,6 +793,7 @@ function showClosed() {
 function hideClosed() {
   closedShown = false;
   document.getElementById('closed').classList.remove('show');
+  clearScanFeedback();
 }
 
 /* ---------- read-only scanner status presentation ---------- */
@@ -871,8 +879,22 @@ async function refreshHeadcount() {
 /* ---------- camera (CE Night init pattern, with hard error surfacing) ---------- */
 const html5QrCode = typeof Html5Qrcode !== 'undefined' ? new Html5Qrcode('reader') : null;
 
+function clearScanFeedback() {
+  const reader = document.getElementById('reader');
+  const hint = document.getElementById('scan-hint');
+  if (reader) reader.classList.remove('scan-detected');
+  if (hint) {
+    hint.classList.remove('scan-detected');
+    hint.textContent = 'Center the full QR inside the square; enlarge the ticket QR on small screens.';
+  }
+}
+
 function onScanSuccess(decodedText) {
   if (busy || closedShown) return;
+  document.getElementById('reader').classList.add('scan-detected');
+  const hint = document.getElementById('scan-hint');
+  hint.classList.add('scan-detected');
+  hint.textContent = 'QR detected — verifying ticket';
   runCheckIn(String(decodedText).trim());
 }
 
@@ -893,7 +915,10 @@ async function initCamera() {
     return showCameraError('Could not list cameras (' + (err && err.message || err) + '). Use lookup below.');
   }
   if (!cameras.length) return showCameraError('No camera detected. Use lookup below.');
-  const qrbox = function (w, h) { const e = Math.min(w, h) * 0.72; return { width: e, height: e }; };
+  const qrbox = function (w, h) {
+    const edge = Math.floor(Math.min(w, h) * 0.88);
+    return { width: edge, height: edge };
+  };
   try {
     await html5QrCode.start({ facingMode: 'environment' }, { fps: 10, qrbox: qrbox }, onScanSuccess, function () {});
   } catch (err) {
@@ -951,6 +976,5 @@ async function doLookup() {
 document.getElementById('manual-submit').addEventListener('click', doLookup);
 document.getElementById('manual-q').addEventListener('keydown', function (e) { if (e.key === 'Enter') doLookup(); });
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a456d930daa4d11a',t:'MTc5MTE0NDgxOQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v31edd6df95cf4e85bb4c19e7a9bdbcba1788362987495" integrity="sha512-iIg7k2xntmwu6/uSb5tpc/hySgZc4eoL31yB29W6tJFo2akwjPWcEqnCEdJvGexCL0KEQwVYv5BlowfhVz26hg==" data-cf-beacon='{"version":"2024.11.0","token":"1954b47c125f43f8b4338b3c4f804e4f","spa":2}' crossorigin="anonymous"></script>
 </body>
 </html>

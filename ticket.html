@@ -41,6 +41,7 @@
       repeating-linear-gradient(115deg, rgba(244,245,237,0.024) 0 2px, transparent 2px 110px),
       linear-gradient(168deg, var(--sys-base) 0%, var(--sys-deepest) 72%);
     background-attachment: fixed;
+    width: 100%; overflow-x: hidden;
     font-family: 'Oswald', sans-serif;
     color: var(--cream);
     display: flex;
@@ -143,7 +144,7 @@
 
   /* ---- body grid ---- */
   .body-grid {
-    display: grid; grid-template-columns: 1fr 200px; gap: 18px;
+    display: grid; grid-template-columns: 1fr 260px; gap: 18px;
     margin-top: 18px;
   }
   .field { margin-bottom: 15px; }
@@ -166,10 +167,10 @@
   }
   .qr-block { text-align: center; }
   .qr-box {
-    background: #F4F5ED; padding: 8px; border-radius: 8px;
+    background: #F4F5ED; padding: 32px; border-radius: 8px;
     display: inline-block; line-height: 0;
   }
-  .qr-box img { width: 132px; height: 132px; display: block; }
+  .qr-box img { width: 190px; height: 190px; display: block; }
   .qr-cap {
     font-family: 'IBM Plex Mono', monospace; font-size: 8.5px;
     letter-spacing: 0.2em; text-transform: uppercase;
@@ -223,6 +224,38 @@
   .save-btn:disabled { opacity: 0.5; cursor: default; }
   .btn-row { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
 
+  #qr-modal[hidden] { display: none; }
+  #qr-modal {
+    position: fixed; inset: 0; z-index: 1000; display: flex; align-items: center; justify-content: center;
+    padding: 16px 16px max(16px, env(safe-area-inset-bottom));
+    background: rgba(5,18,12,0.95);
+  }
+  .qr-modal-panel {
+    width: min(100%,420px); max-height: calc(100vh - 32px); max-height: calc(100svh - 32px);
+    overflow-y: auto; padding: 22px 18px 20px; text-align: center;
+    border: 1px solid rgba(244,245,237,0.34); border-radius: 18px;
+    background: linear-gradient(160deg, #123F2B 0%, #0C2C1D 100%);
+    box-shadow: 0 18px 44px rgba(0,0,0,0.5);
+  }
+  .qr-modal-kicker {
+    color: var(--gold); font: 10px 'IBM Plex Mono', monospace; letter-spacing: 0.16em; text-transform: uppercase;
+  }
+  .qr-modal-title {
+    margin: 8px 0 0; color: var(--cream); font: 600 18px 'Playfair Display', serif; line-height: 1.35;
+  }
+  .qr-modal-code {
+    display: inline-block; margin: 16px auto 8px; padding: min(11vw,40px);
+    border-radius: 10px; background: #FFFFFF; line-height: 0;
+  }
+  #qr-large-code canvas { display: block; width: min(68vw,250px); height: auto; }
+  #qr-large-code img { display: block; width: min(68vw,250px); height: auto; }
+  .qr-modal-note {
+    margin: 4px auto 0; max-width: 330px; color: rgba(244,245,237,0.72);
+    font: 10px/1.6 'IBM Plex Mono', monospace;
+  }
+  #qr-modal-close { min-width: 150px; margin-top: 16px; }
+  #qr-modal-close:focus-visible { outline: 3px solid var(--gold); outline-offset: 3px; }
+
   #agenda-box {
     display: none; width: min(92vw, 720px); margin-top: 22px;
     background: linear-gradient(160deg, rgba(26,97,64,0.4), rgba(12,44,29,0.58));
@@ -255,6 +288,17 @@
   }
   .state-card .sc-body { font-size: 14px; color: rgba(244,245,237,0.65); line-height: 1.8; }
 
+  @media (max-width: 620px) {
+    .btn-row { width: min(calc(100vw - 28px), 560px); gap: 8px; }
+    .btn-row .save-btn, .btn-row .agenda-btn { margin-top: 10px; padding: 10px 14px; font-size: 11px; }
+    .footer-note { width: min(calc(100vw - 28px), 560px); }
+  }
+
+  @media (max-width: 340px) {
+    #qr-modal { padding-left: 8px; padding-right: 8px; }
+    .qr-modal-panel { padding-left: 6px; padding-right: 6px; }
+  }
+
   @media (prefers-reduced-motion: no-preference) {
     .stage { animation: rise 0.6s ease-out; }
   }
@@ -278,13 +322,24 @@
 
 <div class="btn-row" id="btn-row" style="display:none;">
   <button class="save-btn" id="save-btn">Save Ticket as Image</button>
+  <button class="agenda-btn" id="enlarge-qr-btn" type="button" aria-haspopup="dialog" aria-expanded="false" aria-label="Enlarge ticket QR for check-in">Enlarge QR</button>
   <button class="agenda-btn" id="agenda-btn">View Hearing Agenda</button>
+</div>
+<div id="qr-modal" hidden>
+  <div class="qr-modal-panel" role="dialog" aria-modal="true" aria-labelledby="qr-modal-title" aria-describedby="qr-modal-note" tabindex="-1">
+    <div class="qr-modal-kicker">TICKET QR</div>
+    <h2 class="qr-modal-title" id="qr-modal-title">Show this code to check-in staff</h2>
+    <div class="qr-modal-code" id="qr-large-code" role="img" aria-label="Enlarged ticket QR code"></div>
+    <p class="qr-modal-note" id="qr-modal-note">Keep the full code visible and hold the screen steady.</p>
+    <button class="agenda-btn" id="qr-modal-close" type="button">Close</button>
+  </div>
 </div>
 <div id="agenda-box"></div>
 
 <p class="footer-note">
   This ticket is your <strong>attendance record</strong> — present the QR at check-in.
-  The QR encodes only your anonymous ticket ID, never your name or student number.
+  The QR encodes only your anonymous ticket ID, never your name or student number.<br>
+  On a phone, tap <strong>Enlarge QR</strong> if the code is slow to scan.
 </p>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
@@ -316,8 +371,9 @@ const DEPARTMENT_SEALS = {
   'PSG SASTE': 'assets/seals/SASTE.png',
   'PSG SNAHS': 'assets/seals/SNAHS.png',
   'PSG SBAHM': 'assets/seals/SBAHM.png',
-  'PSG SITE': 'assets/seals/SITE.png'
-  // SOM and PSG BEU remain on the placeholder until their seal files are supplied.
+  'PSG SITE': 'assets/seals/SITE.png',
+  'SOM': 'assets/seals/SOM.png'
+  // PSG BEU keeps the SEAL placeholder by department request.
 };
 
 const THEMES = {
@@ -586,7 +642,7 @@ function fillTicket(ticket, theme) {
 
   /* QR — encodes ONLY the random ticket ID. Never personal data. */
   new QRCode(qb, {
-    text: ticket.id, width: 132, height: 132,
+    text: ticket.id, width: 190, height: 190,
     colorDark: '#101418', colorLight: '#F4F5ED',
     correctLevel: QRCode.CorrectLevel.M
   });
@@ -596,6 +652,72 @@ function fillTicket(ticket, theme) {
     if (cv) { const img = new Image(); img.src = cv.toDataURL('image/png'); qb.innerHTML = ''; qb.appendChild(img); }
   }, 60);
 }
+
+let qrModalTrigger = null;
+function openTicketQrModal() {
+  if (!CURRENT || typeof QRCode === 'undefined') return;
+  const modal = $('qr-modal');
+  const slot = $('qr-large-code');
+  if (!modal || !slot) return;
+
+  qrModalTrigger = $('enlarge-qr-btn');
+  const isDemo = String(CURRENT.ticket.id || '').indexOf('PREVIEW-') === 0;
+  $('qr-modal-title').textContent = isDemo ? 'PREVIEW QR — NOT A VALID TICKET' : 'Show this code to check-in staff';
+  $('qr-modal-note').textContent = isDemo
+    ? 'Synthetic preview only. This QR will not admit anyone.'
+    : 'Use the full-size code for check-in. Raise screen brightness and hold steady.';
+  slot.innerHTML = '';
+  slot.setAttribute('aria-label', isDemo ? 'Synthetic demo QR; not a valid ticket.' : 'Enlarged anonymous ticket QR code.');
+  new QRCode(slot, {
+    text: String(CURRENT.ticket.id), width: 250, height: 250,
+    colorDark: '#101418', colorLight: '#FFFFFF',
+    correctLevel: QRCode.CorrectLevel.M
+  });
+  const modalCanvas = slot.querySelector('canvas');
+  if (modalCanvas) {
+    const modalImage = new Image();
+    modalImage.alt = isDemo ? 'Synthetic demo QR code; not valid for check-in.' : 'Ticket QR code.';
+    modalImage.src = modalCanvas.toDataURL('image/png');
+    slot.replaceChildren(modalImage);
+  } else {
+    const fallbackImage = slot.querySelector('img');
+    if (fallbackImage) {
+      fallbackImage.style.display = 'block';
+      fallbackImage.style.width = 'min(68vw,250px)';
+      fallbackImage.style.height = 'auto';
+    }
+  }
+  modal.hidden = false;
+  $('enlarge-qr-btn').setAttribute('aria-expanded', 'true');
+  $('qr-modal-close').focus();
+}
+
+function closeTicketQrModal() {
+  const modal = $('qr-modal');
+  if (!modal || modal.hidden) return;
+  modal.hidden = true;
+  $('qr-large-code').innerHTML = '';
+  $('enlarge-qr-btn').setAttribute('aria-expanded', 'false');
+  const trigger = qrModalTrigger;
+  qrModalTrigger = null;
+  if (trigger && typeof trigger.focus === 'function') trigger.focus();
+}
+
+$('enlarge-qr-btn').addEventListener('click', openTicketQrModal);
+$('qr-modal-close').addEventListener('click', closeTicketQrModal);
+$('qr-modal').addEventListener('click', function (event) {
+  if (event.target === this) closeTicketQrModal();
+});
+$('qr-modal').addEventListener('keydown', function (event) {
+  if (event.key === 'Escape') {
+    closeTicketQrModal();
+    return;
+  }
+  if (event.key === 'Tab') {
+    event.preventDefault();
+    $('qr-modal-close').focus();
+  }
+});
 
 function renderState(kind, message) {
   const wrap = $('scale-wrap');
@@ -816,8 +938,8 @@ document.getElementById('save-btn').addEventListener('click', async function () 
         const octx = canvas.getContext('2d');
         octx.setTransform(1, 0, 0, 1, 0, 0);
         octx.drawImage(qrLiveImg,
-          (boxRect.left + 10000 + 8) * k, (boxRect.top + 8) * k,
-          132 * k, 132 * k);
+          (boxRect.left + 10000 + 32) * k, (boxRect.top + 32) * k,
+          190 * k, 190 * k);
       }
     } catch (qrErr) { /* box stays; never fail the export on the overlay */ }
     const link = document.createElement('a');
@@ -880,6 +1002,5 @@ document.getElementById('agenda-btn').addEventListener('click', async function (
 
 document.addEventListener('DOMContentLoaded', boot);
 </script>
-<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v31edd6df95cf4e85bb4c19e7a9bdbcba1788362987495" integrity="sha512-iIg7k2xntmwu6/uSb5tpc/hySgZc4eoL31yB29W6tJFo2akwjPWcEqnCEdJvGexCL0KEQwVYv5BlowfhVz26hg==" data-cf-beacon='{"version":"2024.11.0","token":"1954b47c125f43f8b4338b3c4f804e4f","spa":2}' crossorigin="anonymous"></script>
 </body>
 </html>
