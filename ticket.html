@@ -76,7 +76,7 @@
 
   /* ---- full-bleed diagonal ribbon, pinned to the panel's top edge ---- */
   .ribbon {
-    position: absolute; top: 44px; left: -22px; right: -22px; height: 56px;
+    position: absolute; top: 64px; left: -22px; right: -22px; height: 56px;
     transform: rotate(-3.12deg); transform-origin: 50% 50%;
     border-top: 3px solid #F4F5ED;      /* cream hairline — CONSTANT */
     border-bottom: 3px solid #F4F5ED;   /* cream hairline — CONSTANT */
@@ -98,7 +98,7 @@
 
   /* ---- frosted rounded panel, top edge collinear with ribbon top ---- */
   .panel {
-    position: absolute; left: 33px; right: 33px; top: 44px; bottom: 70px;
+    position: absolute; left: 33px; right: 33px; top: 64px; bottom: 70px;
     background: rgba(255,255,255,0.06);
     border: 2px solid rgba(255,255,255,0.5);
     border-radius: 17px;
@@ -134,7 +134,7 @@
   }
   .seal-ph.with-seal {
     border: 1px solid rgba(219,190,102,0.78);
-    border-radius: 50px;
+    border-radius: 50%;
     background: #F4F5ED;
     overflow: hidden;
   }
@@ -324,7 +324,9 @@
   <button class="save-btn" id="save-btn">Save Ticket as Image</button>
   <button class="agenda-btn" id="enlarge-qr-btn" type="button" aria-haspopup="dialog" aria-expanded="false" aria-label="Enlarge ticket QR for check-in">Enlarge QR</button>
   <button class="agenda-btn" id="agenda-btn">View Hearing Agenda</button>
+  <button class="agenda-btn" id="timeout-btn" type="button">Event Evaluation / Time Out</button>
 </div>
+<p class="footer-note" id="timeout-state" style="display:none;" role="status" aria-live="polite"></p>
 <div id="qr-modal" hidden>
   <div class="qr-modal-panel" role="dialog" aria-modal="true" aria-labelledby="qr-modal-title" aria-describedby="qr-modal-note" tabindex="-1">
     <div class="qr-modal-kicker">TICKET QR</div>
@@ -780,6 +782,8 @@ async function boot() {
       FX({ canvas: $('fx'), color: theme.accent, pattern: theme.fx, duration: 2.4 });
     });
     $('btn-row').querySelector('#agenda-btn').style.display = 'none';
+    $('timeout-btn').style.display = 'none';
+    $('timeout-state').style.display = 'none';
     $('btn-row').style.display = 'flex';
     return;
   }
@@ -828,7 +832,7 @@ async function boot() {
       }
       if (res.status === 'full') return renderState('full', 'All seats for this hearing have been claimed. Please contact your council representative about overflow accommodation.');
       if (res.status === 'closed') return renderState('closed', 'Registration for this hearing is currently closed.');
-      return renderState('error', (res.message || 'Registration could not be completed.') + ' Please try again from the official form link, or ask the PSG-UNIWIDE registration desk.');
+      return renderState('error', (res.message || 'Registration could not be completed.') + ' Please try again from the official form link, or ask the PSG-ICE registration desk.');
     }
 
     // Loud "broken link" state (CE Night lesson: failure must be obvious,
@@ -860,6 +864,17 @@ async function boot() {
     scale();
 
     fillTicket(ticket, theme);
+    const timeoutButton = $('timeout-btn');
+    const timeoutState = $('timeout-state');
+    if (ticket.timedOut) {
+      timeoutButton.style.display = 'none';
+      timeoutState.style.display = 'block';
+      timeoutState.textContent = 'Timeout recorded' + (ticket.timedOutAt ? ' at ' + ticket.timedOutAt + ' PHT.' : '.');
+    } else {
+      timeoutButton.style.display = 'inline-block';
+      timeoutState.style.display = 'none';
+      timeoutState.textContent = '';
+    }
     $('btn-row').style.display = 'flex';
 
     // Decorative effect runs AFTER content is visible and exportable.
@@ -998,6 +1013,13 @@ document.getElementById('agenda-btn').addEventListener('click', async function (
   function head() {
     return '<h3>Hearing Agenda</h3>';
   }
+});
+
+document.getElementById('timeout-btn').addEventListener('click', function () {
+  if (!CURRENT || !CURRENT.ticket || /^PREVIEW-/.test(String(CURRENT.ticket.id || ''))) return;
+  const target = new URL('evaluation/timeout.html', location.href);
+  target.searchParams.set('t', String(CURRENT.ticket.id));
+  location.assign(target.href);
 });
 
 document.addEventListener('DOMContentLoaded', boot);

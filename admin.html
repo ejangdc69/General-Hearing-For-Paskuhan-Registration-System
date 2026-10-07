@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Admin Console — Student Council Schoolwide Meeting</title>
+<title>Admin Console — Student Council Public Hearing</title>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600&family=Oswald:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
 
@@ -256,6 +256,8 @@
       <div class="counts">
         <span>Registered: <b id="c-reg"><span id="c-reg-count" data-count>–</span> / cap <span id="c-reg-cap">–</span></b></span>
         <span>Checked in: <b id="c-in" data-count>–</b></span>
+        <span>Timed out (evaluation): <b id="c-timeout" data-count>–</b></span>
+        <span>Checked in, no timeout: <b id="c-in-no-timeout" data-count>–</b></span>
         <span>No-shows: <b id="c-out" data-count>–</b></span>
         <span>Server time (PHT): <b id="c-time">–</b></span>
       </div>
@@ -732,6 +734,8 @@ function renderState(d, options) {
   animateCount(document.getElementById('c-reg-count'), d.registered);
   document.getElementById('c-reg-cap').textContent = d.settings.regCapacity;
   animateCount(document.getElementById('c-in'), d.checkedIn);
+  animateCount(document.getElementById('c-timeout'), d.timedOut);
+  animateCount(document.getElementById('c-in-no-timeout'), d.checkedInNoTimeout);
   animateCount(document.getElementById('c-out'), d.noShows);
   syncServerClock(d.serverTime);
   lastStateUpdated = Date.now(); statePollFailed = false; updateLiveAge();
@@ -966,15 +970,37 @@ loadExportButton.addEventListener('click', function () {
 });
 
 function renderExport() {
-  const regs = exportData.registrants;
-  let html = '<p class="note">' + (regs.length) + ' registrants · generated ' + exportData.generatedAt + ' (' + exportData.tz + '). Columns: name · council · position · code · checked in · by whom.</p>';
-  html += '<table class="data"><thead><tr><th>#</th><th>Name</th><th>Council</th><th>Position</th><th>Code</th><th>Checked in</th><th>By</th></tr></thead><tbody>';
+  const regs = exportData.registrants || [];
+  const evals = exportData.evaluations || [];
+  let html = '<p class="note">' + regs.length + ' registrants · ' + evals.length +
+    ' verified evaluation/time-out submissions · generated ' + esc(exportData.generatedAt) + ' (' + esc(exportData.tz) + ').</p>';
+  html += '<table class="data"><thead><tr><th>#</th><th>Name</th><th>Council</th><th>Position</th><th>Code</th><th>Checked in</th><th>By</th><th>Timeout status</th><th>Timed out at</th></tr></thead><tbody>';
   regs.forEach(function (r, i) {
     html += '<tr><td>' + (i + 1) + '</td><td>' + esc(r.full_name) + '</td><td>' + esc(r.council) +
       '</td><td>' + esc(r.position) + '</td><td class="mono">' + esc(r.short_code) + '</td><td class="mono">' +
-      (r.checked_in_at || '—') + '</td><td>' + esc(r.checked_in_by || '') + '</td></tr>';
+      esc(r.checked_in_at || '—') + '</td><td>' + esc(r.checked_in_by || '') + '</td><td>' +
+      esc(r.timeout_status || '') + '</td><td class="mono">' + esc(r.timed_out_at || '—') + '</td></tr>';
   });
-  html += '</tbody></table>';
+  html += '</tbody></table><h3>Evaluation responses</h3>';
+  if (!evals.length) {
+    html += '<p class="note">No verified evaluation submissions yet.</p>';
+  } else {
+    const evalCols = [
+      ['ticket_id', 'Ticket ID'], ['submitted_at', 'Submitted At'],
+      ['tally_submission_id', 'Tally Submission ID'], ['activity_title', 'Activity'], ['date_venue', 'Date & Venue'],
+      ['criterion_1', 'Criterion 1'], ['criterion_2', 'Criterion 2'], ['criterion_3', 'Criterion 3'],
+      ['criterion_4', 'Criterion 4'], ['criterion_5', 'Criterion 5'], ['criterion_6', 'Criterion 6'],
+      ['criterion_7', 'Criterion 7'], ['comments', 'Comment/Suggestions']
+    ];
+    html += '<table class="data"><thead><tr>' + evalCols.map(function (c) { return '<th>' + c[1] + '</th>'; }).join('') + '</tr></thead><tbody>';
+    evals.forEach(function (r) {
+      html += '<tr>' + evalCols.map(function (c) {
+        return '<td' + (c[0] === 'ticket_id' || c[0] === 'submitted_at' || c[0] === 'tally_submission_id' ? ' class="mono"' : '') + '>' +
+          esc(r[c[0]] || '') + '</td>';
+      }).join('') + '</tr>';
+    });
+    html += '</tbody></table>';
+  }
   document.getElementById('export-box').innerHTML = html;
 
   const log = exportData.log || [];
@@ -1027,17 +1053,16 @@ function sortRegistrants(regs) {
 
 /* ================ MASTER WORKBOOK (per-council tabs, XLSX) ================
    One click → one .xlsx:
-     • Headcount tab — per-council Registered / Checked In / No-Show / Absent +
-       Attendance % (traffic-light fills) for post-event accounting
-     • One tab per council — ticket-palette color identity, officer-ladder sort,
-       tri-state row styling (checked in = green tint, no-show = red text)
-     • Scan Log audit tab
+     • Headcount tab — registration, check-in, evaluation timeout and no-timeout counts
+     • One tab per council — ticket-palette identity, officer-ladder sort,
+       check-in/timeout timestamps and explicit timeout status
+     • Scan Log audit tab + verified Evaluation Log with all seven rubric responses
    Every tab: banner + frozen filterable headers + A4 landscape print setup
    (header rows repeat on every printed page, page-numbered footer).
    Pure-function core (buildMasterWorkbook) is unit-testable outside the
    browser; DOM only touches it at the click seam. */
-const NO_SHOW_WORDS = ['TRUE', 'true', 'yes', 'Yes', '1'];
-function isNoShow(v) { return v === true || NO_SHOW_WORDS.indexOf(String(v)) !== -1; }
+const NO_SHOW_WORDS = ['true', 'yes', '1'];
+function isNoShow(v) { return v === true || NO_SHOW_WORDS.indexOf(String(v).trim().toLowerCase()) !== -1; }
 
 /* Council identity — pulled 1:1 from the ticket color system */
 const COUNCIL_XLSX = {
@@ -1054,8 +1079,10 @@ function councilToTabName(council) {
   const clean = String(council || '').replace(/^PSG\s+/i, '').trim();
   return (clean.toUpperCase() || 'OTHER').slice(0, 31);
 }
-/* "Nov 26 2026 02:34 PM" → real Excel datetime (fallback: raw string) */
+/* PHT timestamps and legacy Excel display text → real Excel datetime. */
 function parseStamp(v) {
+  const pht = String(v || '').match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2}):(\d{2})$/);
+  if (pht) return new Date(+pht[1], +pht[2] - 1, +pht[3], +pht[4], +pht[5], +pht[6]);
   const m = String(v || '').match(/^(\w{3})\s+(\d{1,2})\s+(\d{4})\s+(\d{1,2}):(\d{2})\s*(AM|PM)/i);
   if (!m) return String(v || '');
   const mon = ['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec'].indexOf(m[1].toLowerCase());
@@ -1070,16 +1097,18 @@ async function buildMasterWorkbook(data) {
   wb.creator = 'PSG Uniwide — Admin Console';
   wb.company = 'PSG Uniwide';
   wb.title = 'Meeting For Paskuhan 2026 Master List';
-  wb.subject = 'Registrant master list with per-council tabs';
+  wb.subject = 'Registrant master list, timeout status, and verified evaluations';
   wb.created = new Date();
 
   const COLS = [
     ['ticket_id', 'Ticket ID', 18], ['short_code', 'Code', 8], ['full_name', 'Name', 26],
     ['council', 'Council', 14], ['position', 'Position / Title', 26], ['student_number', 'Student No.', 14],
     ['registered_at', 'Registered At', 20], ['checked_in_at', 'Checked In At', 20],
-    ['checked_in_by', 'Checked In By', 14], ['no_show', 'No-Show', 9]];
+    ['checked_in_by', 'Checked In By', 14], ['timed_out_at', 'Timed Out At', 20],
+    ['timeout_status', 'Timeout Status', 25], ['no_show', 'No-Show', 9]];
   const INST_BLUE = 'FF0D1B3D', INST_GOLD = 'FFD4AF37';
   const GREEN_TINT = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFDCF5E3' } };
+  const AMBER_TINT = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFF4D6' } };
   const RED_TEXT = { color: { argb: 'FFB00020' } };
 
   function solid(argb) { return { type: 'pattern', pattern: 'solid', fgColor: { argb: argb } }; }
@@ -1118,30 +1147,33 @@ async function buildMasterWorkbook(data) {
   const hc = wb.addWorksheet('Headcount');
   hc.properties.tabColor = { argb: INST_GOLD };
   const HC_BLUE = { accent: INST_BLUE, lightText: true };
-  banner(hc, 'HEADCOUNT · Meeting For Paskuhan 2026 Master List', HC_BLUE, 'F');
+  banner(hc, 'HEADCOUNT · Meeting For Paskuhan 2026 Master List', HC_BLUE, 'H');
   styleHeader(hc, HC_BLUE, [
     ['c', 'Council', 16], ['r', 'Registered', 11], ['i', 'Checked In', 11],
-    ['n', 'No-Show', 9], ['a', 'Absent (not scanned)', 19], ['p', 'Attendance', 11]]);
-  hc.autoFilter = 'A2:F2';
-  let totR = 0, totI = 0, totN = 0, totA = 0;
+    ['n', 'No-Show', 9], ['a', 'Absent (not scanned)', 19], ['t', 'Timed Out', 11],
+    ['u', 'In / No Timeout', 16], ['p', 'Check-In %', 11]]);
+  hc.autoFilter = 'A2:H2';
+  let totR = 0, totI = 0, totN = 0, totA = 0, totT = 0, totU = 0;
   COUNCIL_ORDER.forEach(function (council) {
     const regs = (data.registrants || []).filter(function (r) { return r.council === council; });
     const nR = regs.length;
     const nN = regs.filter(function (r) { return isNoShow(r.no_show); }).length;
     const nI = regs.filter(function (r) { return !!r.checked_in_at; }).length;
+    const nT = regs.filter(function (r) { return !!r.timed_out_at; }).length;
+    const nU = regs.filter(function (r) { return !!r.checked_in_at && !r.timed_out_at; }).length;
     const nA = nR - nI - nN;
-    totR += nR; totI += nI; totN += nN; totA += nA;
-    const row = hc.addRow({ c: councilToTabName(council), r: nR, i: nI, n: nN, a: nA });
-    const pc = hc.getCell('F' + row.number);
+    totR += nR; totI += nI; totN += nN; totA += nA; totT += nT; totU += nU;
+    const row = hc.addRow({ c: councilToTabName(council), r: nR, i: nI, n: nN, a: nA, t: nT, u: nU });
+    const pc = hc.getCell('H' + row.number);
     if (nR > 0) {
       pc.value = nI / nR; pc.numFmt = '0%';
       pc.fill = solid(nI / nR >= 0.85 ? 'FFDCF5E3' : nI / nR >= 0.6 ? 'FFFCF2CF' : 'FFFBDCDC');
     } else { pc.value = '—'; pc.alignment = { horizontal: 'center' }; }
     hc.getCell('A' + row.number).font = { bold: true };
   });
-  const tr = hc.addRow({ c: 'TOTAL', r: totR, i: totI, n: totN, a: totA });
+  const tr = hc.addRow({ c: 'TOTAL', r: totR, i: totI, n: totN, a: totA, t: totT, u: totU });
   tr.font = { bold: true }; tr.fill = solid('FFEFE6CF');
-  if (totR > 0) { const tp = hc.getCell('F' + tr.number); tp.value = totI / totR; tp.numFmt = '0%'; tp.font = { bold: true }; }
+  if (totR > 0) { const tp = hc.getCell('H' + tr.number); tp.value = totI / totR; tp.numFmt = '0%'; tp.font = { bold: true }; }
   hc.addRow({ c: 'Generated ' + data.generatedAt + ' (' + data.tz + ')' }).font = { italic: true, color: { argb: 'FF666666' } };
   printSetup(hc, 'Headcount');
 
@@ -1151,12 +1183,13 @@ async function buildMasterWorkbook(data) {
     const tab = councilToTabName(council);
     const ws = wb.addWorksheet(tab);
     ws.properties.tabColor = { argb: cfg.accent };
-    banner(ws, council.toUpperCase() + ' · Meeting For Paskuhan 2026 Master List', cfg);
+    banner(ws, council.toUpperCase() + ' · Meeting For Paskuhan 2026 Master List', cfg, 'L');
     styleHeader(ws, cfg, COLS);
+    ws.autoFilter = 'A2:L2';
     const regs = sortRegistrants((data.registrants || []).filter(function (r) { return r.council === council; }));
     if (!regs.length) {
       ws.addRow([]);
-      const n = ws.addRow([]); ws.mergeCells('A' + n.number + ':J' + n.number);
+      const n = ws.addRow([]); ws.mergeCells('A' + n.number + ':L' + n.number);
       const nc = ws.getCell('A' + n.number);
       nc.value = '— No registrants yet —';
       nc.font = { italic: true, color: { argb: 'FF999999' } };
@@ -1164,15 +1197,17 @@ async function buildMasterWorkbook(data) {
     }
     regs.forEach(function (r, i) {
       const row = ws.addRow(COLS.map(function (c) {
-        return (c[0] === 'registered_at' || c[0] === 'checked_in_at')
+        return (c[0] === 'registered_at' || c[0] === 'checked_in_at' || c[0] === 'timed_out_at')
           ? (r[c[0]] ? parseStamp(r[c[0]]) : '')
           : (r[c[0]] == null || r[c[0]] === false ? '' : String(r[c[0]]));
       }));
-      row.getCell(7).numFmt = STAMP_FMT; row.getCell(8).numFmt = STAMP_FMT;
+      row.getCell(7).numFmt = STAMP_FMT; row.getCell(8).numFmt = STAMP_FMT; row.getCell(10).numFmt = STAMP_FMT;
       row.getCell(2).alignment = { horizontal: 'center' };
-      row.getCell(10).alignment = { horizontal: 'center' };
+      row.getCell(11).alignment = { horizontal: 'center' };
+      row.getCell(12).alignment = { horizontal: 'center' };
       if (isNoShow(r.no_show)) { row.font = RED_TEXT; }
-      else if (r.checked_in_at) { row.fill = GREEN_TINT; }
+      else if (r.timed_out_at) { row.fill = GREEN_TINT; }
+      else if (r.checked_in_at) { row.fill = AMBER_TINT; }
       else if (i % 2 === 1) { row.fill = solid(cfg.zebra); }
     });
     printSetup(ws, tab);
@@ -1189,6 +1224,37 @@ async function buildMasterWorkbook(data) {
     sl.addRow([x.ts || '', x.ticket_id || '', x.result || '', x.staff || '']);
   });
   printSetup(sl, 'Scan Log');
+
+  /* ---- Tab 11: verified evaluation responses ---- */
+  const ev = wb.addWorksheet('Evaluation Log');
+  ev.properties.tabColor = { argb: 'FF287B55' };
+  const EV_GREEN = { accent: 'FF287B55', lightText: true };
+  banner(ev, 'EVALUATION LOG · Verified Tally submissions', EV_GREEN, 'M');
+  const EVAL_COLS = [
+    ['submitted_at', 'Submitted At (PHT)', 20], ['ticket_id', 'Ticket ID', 18],
+    ['tally_submission_id', 'Tally Submission ID', 22], ['activity_title', 'Activity Title', 28],
+    ['date_venue', 'Date & Venue', 24], ['criterion_1', 'Criterion 1', 40],
+    ['criterion_2', 'Criterion 2', 40], ['criterion_3', 'Criterion 3', 40],
+    ['criterion_4', 'Criterion 4', 40], ['criterion_5', 'Criterion 5', 40],
+    ['criterion_6', 'Criterion 6', 40], ['criterion_7', 'Criterion 7', 40],
+    ['comments', 'Comment/Suggestions', 40]
+  ];
+  styleHeader(ev, EV_GREEN, EVAL_COLS);
+  ev.autoFilter = 'A2:M2';
+  (data.evaluations || []).forEach(function (r) {
+    const values = EVAL_COLS.map(function (c) {
+      return c[0] === 'submitted_at'
+        ? (r[c[0]] ? parseStamp(r[c[0]]) : '')
+        : String(r[c[0]] == null ? '' : r[c[0]]);
+    });
+    const row = ev.addRow(values);
+    row.getCell(1).numFmt = STAMP_FMT;
+    for (let c = 6; c <= 13; c++) {
+      row.getCell(c).alignment = { vertical: 'top', wrapText: true };
+    }
+    row.height = 58;
+  });
+  printSetup(ev, 'Evaluation Log');
 
   return wb.xlsx.writeBuffer();
 }
@@ -1215,6 +1281,5 @@ document.getElementById('print-btn').addEventListener('click', function () {
   runAction(button, 'Preparing print…', function () { window.print(); msg('Opening print dialog.'); });
 });
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a4562669fe86383f',t:'MTc5MTEzNzQ5Ng=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v31edd6df95cf4e85bb4c19e7a9bdbcba1788362987495" integrity="sha512-iIg7k2xntmwu6/uSb5tpc/hySgZc4eoL31yB29W6tJFo2akwjPWcEqnCEdJvGexCL0KEQwVYv5BlowfhVz26hg==" data-cf-beacon='{"version":"2024.11.0","token":"1954b47c125f43f8b4338b3c4f804e4f","spa":2}' crossorigin="anonymous"></script>
 </body>
 </html>
