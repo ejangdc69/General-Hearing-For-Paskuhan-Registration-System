@@ -828,7 +828,7 @@ async function boot() {
       }
       if (res.status === 'full') return renderState('full', 'All seats for this hearing have been claimed. Please contact your council representative about overflow accommodation.');
       if (res.status === 'closed') return renderState('closed', 'Registration for this hearing is currently closed.');
-      return renderState('error', (res.message || 'Registration could not be completed.') + ' Please try again from the official form link, or ask the PSG-ICE registration desk.');
+      return renderState('error', (res.message || 'Registration could not be completed.') + ' Please try again from the official form link, or ask the PSG-UNIWIDE registration desk.');
     }
 
     // Loud "broken link" state (CE Night lesson: failure must be obvious,
