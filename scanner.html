@@ -322,6 +322,7 @@
   .camera-led { width: 7px; height: 7px; background: var(--sys-hi); }
   .camera-mode { font-family: var(--mono); font-size: 8px; letter-spacing: 0.09em; color: var(--gold); }
   #reader {
+    position: relative; /* Anchor html5-qrcode's shade and corner overlay to the camera frame. */
     width: 100%; min-height: 210px; margin: 0 auto; overflow: hidden; border-radius: 12px;
     background: #071C13; border: 1px solid rgba(244,245,237,0.16); color: var(--cream);
   }
@@ -664,7 +665,9 @@ function withAuth(extra) {
 document.getElementById('g-go').addEventListener('click', startShift);
 document.getElementById('g-pin').addEventListener('keydown', function (e) { if (e.key === 'Enter') startShift(); });
 
+let authInProgress = false;
 async function startShift() {
+  if (authInProgress) return;
   staffId = document.getElementById('g-staff').value;
   staffPin = document.getElementById('g-pin').value.trim();
   const msg = document.getElementById('g-msg');
@@ -672,6 +675,12 @@ async function startShift() {
   if (!staffPin) { msg.textContent = 'Enter your PIN.'; return; }
   if (staffPin.length < 6) { msg.textContent = 'PINs are 6+ characters (letters & digits).'; return; }
   if (APPS_SCRIPT_URL.indexOf('PASTE_') === 0) { msg.textContent = 'Scanner not configured (APPS_SCRIPT_URL missing).'; return; }
+
+  const button = document.getElementById('g-go');
+  authInProgress = true;
+  button.disabled = true;
+  button.setAttribute('aria-busy', 'true');
+  button.textContent = 'Verifying PIN…';
   try {
     const res = await api({ action: 'auth', staffId: staffId, pin: staffPin });
     if (res.status === 'ok') {
@@ -685,7 +694,14 @@ async function startShift() {
     } else {
       msg.textContent = 'Access denied (' + res.status + ').';
     }
-  } catch (e) { msg.textContent = 'Could not reach the server — check connection.'; }
+  } catch (e) {
+    msg.textContent = 'Could not reach the server — check connection.';
+  } finally {
+    authInProgress = false;
+    button.disabled = false;
+    button.removeAttribute('aria-busy');
+    button.textContent = 'Start Shift';
+  }
 }
 
 function enterApp() {
@@ -877,7 +893,13 @@ async function refreshHeadcount() {
 }
 
 /* ---------- camera (CE Night init pattern, with hard error surfacing) ---------- */
-const html5QrCode = typeof Html5Qrcode !== 'undefined' ? new Html5Qrcode('reader') : null;
+// Tickets in this system use QR codes only; skip decoding unrelated barcode formats.
+const qrOnlyFormats = typeof Html5QrcodeSupportedFormats !== 'undefined'
+  ? [Html5QrcodeSupportedFormats.QR_CODE]
+  : undefined;
+const html5QrCode = typeof Html5Qrcode !== 'undefined'
+  ? new Html5Qrcode('reader', { formatsToSupport: qrOnlyFormats })
+  : null;
 
 function clearScanFeedback() {
   const reader = document.getElementById('reader');
@@ -919,11 +941,12 @@ async function initCamera() {
     const edge = Math.floor(Math.min(w, h) * 0.88);
     return { width: edge, height: edge };
   };
+  // At 15 fps, the scan loop checks about every 67 ms; QR-only decoding keeps the extra work bounded.
   try {
-    await html5QrCode.start({ facingMode: 'environment' }, { fps: 10, qrbox: qrbox }, onScanSuccess, function () {});
+    await html5QrCode.start({ facingMode: 'environment' }, { fps: 15, qrbox: qrbox }, onScanSuccess, function () {});
   } catch (err) {
     try {
-      await html5QrCode.start(cameras[0].id, { fps: 10, qrbox: qrbox }, onScanSuccess, function () {});
+      await html5QrCode.start(cameras[0].id, { fps: 15, qrbox: qrbox }, onScanSuccess, function () {});
     } catch (err2) {
       showCameraError('Could not start camera (' + (err2 && err2.message || err2) + '). Use lookup below or reload.');
     }
