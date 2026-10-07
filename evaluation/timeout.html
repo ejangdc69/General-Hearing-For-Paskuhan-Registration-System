@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#0C2C1D">
+<title>Event Evaluation &amp; Time Out — PSG Uniwide</title>
+<style>
+  :root {
+    color-scheme: dark;
+    --deep: #0C2C1D;
+    --base: #11402A;
+    --green: #1A6140;
+    --cream: #F4F5ED;
+    --gold: #DBBE66;
+    --muted: rgba(244,245,237,.72);
+    --line: rgba(244,245,237,.28);
+    --error: #FFD7D2;
+    --success: #B8F0D0;
+  }
+  * { box-sizing: border-box; }
+  html, body { min-height: 100%; }
+  body {
+    margin: 0; padding: 22px 14px 40px; color: var(--cream);
+    background: radial-gradient(120% 70% at 50% 0%, rgba(51,193,127,.15), transparent 62%),
+      linear-gradient(165deg, var(--base), var(--deep) 75%);
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  }
+  main { width: min(100%, 820px); margin: 0 auto; }
+  .brand {
+    color: var(--gold); font: 600 11px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
+    letter-spacing: .16em; text-transform: uppercase; text-align: center;
+  }
+  h1 {
+    margin: 10px 0 8px; text-align: center; font: 650 clamp(24px, 5vw, 36px)/1.15 Georgia, "Times New Roman", serif;
+    letter-spacing: .025em;
+  }
+  .lead { margin: 0 auto 18px; max-width: 650px; color: var(--muted); text-align: center; line-height: 1.65; font-size: 14px; }
+  .card {
+    padding: clamp(16px, 4vw, 26px); border: 1px solid var(--line); border-radius: 16px;
+    background: rgba(8,31,21,.66); box-shadow: 0 14px 38px rgba(0,0,0,.28), inset 0 1px 0 rgba(244,245,237,.12);
+  }
+  .status {
+    min-height: 26px; margin: 0 0 14px; color: var(--muted); font-size: 14px; line-height: 1.55;
+  }
+  .status.error { color: var(--error); }
+  .status.success { color: var(--success); }
+  .status.busy { color: var(--gold); }
+  .ticket-entry { display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: end; }
+  label { display: block; margin: 0 0 6px; color: var(--cream); font-size: 13px; font-weight: 650; }
+  input {
+    width: 100%; min-height: 46px; padding: 11px 12px; border: 1px solid var(--line); border-radius: 8px;
+    background: rgba(4,18,12,.62); color: var(--cream); font: 15px ui-monospace, SFMono-Regular, Menlo, monospace;
+    letter-spacing: .06em;
+  }
+  input::placeholder { color: rgba(244,245,237,.4); }
+  button, .button-link {
+    min-height: 44px; display: inline-flex; align-items: center; justify-content: center;
+    padding: 10px 16px; border: 1px solid var(--gold); border-radius: 8px;
+    background: var(--gold); color: var(--deep); text-decoration: none; cursor: pointer;
+    font: 700 12px/1.2 system-ui, sans-serif; letter-spacing: .08em; text-transform: uppercase;
+  }
+  button:disabled { opacity: .6; cursor: wait; }
+  .note { margin: 14px 0 0; color: rgba(244,245,237,.58); font-size: 12px; line-height: 1.6; }
+  .form-shell { display: none; margin-top: 18px; overflow: hidden; border: 1px solid var(--line); border-radius: 12px; background: rgba(244,245,237,.04); }
+  .form-shell.active { display: block; }
+  .form-shell iframe { display: block; width: 100%; min-height: 900px; border: 0; background: transparent; }
+  .success-box { display: none; padding: 8px 0 2px; text-align: center; }
+  .success-box.active { display: block; }
+  .success-mark {
+    width: 52px; height: 52px; margin: 0 auto 12px; display: grid; place-items: center;
+    border: 1px solid rgba(184,240,208,.58); border-radius: 50%; color: var(--success); font-size: 27px;
+    background: rgba(46,158,106,.16);
+  }
+  .success-box h2 { margin: 0 0 8px; font: 650 23px/1.2 Georgia, "Times New Roman", serif; }
+  .success-box p { color: var(--muted); line-height: 1.6; }
+  #retry-verify { display: none; margin-top: 8px; }
+  .smallprint { margin: 16px 4px 0; color: rgba(244,245,237,.5); font-size: 11px; line-height: 1.6; text-align: center; }
+  [hidden] { display: none !important; }
+  @media (max-width: 560px) {
+    body { padding: 16px 10px 28px; }
+    .ticket-entry { grid-template-columns: 1fr; }
+    .ticket-entry button { width: 100%; }
+    .form-shell iframe { min-height: 1080px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; transition-duration: .01ms !important; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <div class="brand">PSG Uniwide · Activity Close-Out</div>
+  <h1>Event Evaluation &amp; Time Out</h1>
+  <p class="lead">Complete the activity evaluation to record your event time-out. The system records a time-out only after it verifies a completed Tally response against your checked-in ticket.</p>
+
+  <section class="card" aria-labelledby="form-heading">
+    <h2 id="form-heading" style="position:absolute;left:-9999px;">Evaluation and timeout form</h2>
+    <p id="status" class="status" role="status" aria-live="polite">Checking your ticket…</p>
+
+    <form id="ticket-entry" class="ticket-entry" hidden>
+      <div>
+        <label for="ticket-id">Ticket ID</label>
+        <input id="ticket-id" name="ticket-id" type="text" maxlength="32" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="HS26-XXXX-XXXX-XXXX" required>
+      </div>
+      <button id="continue-btn" type="submit">Continue</button>
+    </form>
+    <p id="entry-note" class="note" hidden>Open this page from the Event Evaluation / Time Out button on your ticket, or enter the ticket ID printed on your valid ticket. No name or student number is requested here.</p>
+
+    <div id="form-shell" class="form-shell" aria-label="Tally evaluation form"></div>
+    <button id="retry-verify" type="button">Retry timeout verification</button>
+    <a id="return-ticket" class="button-link" href="../ticket.html" style="display:none;margin-top:8px;">Return to ticket</a>
+
+    <div id="success-box" class="success-box" role="status" aria-live="polite">
+      <div class="success-mark" aria-hidden="true">✓</div>
+      <h2>Time Out Recorded</h2>
+      <p id="success-time">Your evaluation was verified and your time-out is recorded.</p>
+      <a id="back-ticket" class="button-link" href="../ticket.html">Back to ticket</a>
+    </div>
+  </section>
+
+  <p class="smallprint">Your ticket ID is used only to associate this response with its registration and check-in record. The evaluation answers are stored with the event record; no personal identity fields are added to the form.</p>
+</main>
+<script>
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyqBLqb3GVID6di3TkB-1GLXgMVxyAgWeUL1ErqukfO2xO_b-_ehl05nloDBbTMuVBj/exec';
+const TALLY_EMBED_BASE = 'https://tally.so/embed/';
+const TALLY_WIDGET_URL = 'https://tally.so/widgets/embed.js';
+const statusNode = document.getElementById('status');
+const entryForm = document.getElementById('ticket-entry');
+const entryNote = document.getElementById('entry-note');
+const ticketInput = document.getElementById('ticket-id');
+const continueButton = document.getElementById('continue-btn');
+const formShell = document.getElementById('form-shell');
+const retryButton = document.getElementById('retry-verify');
+const successBox = document.getElementById('success-box');
+const successTime = document.getElementById('success-time');
+const backTicket = document.getElementById('back-ticket');
+const returnTicket = document.getElementById('return-ticket');
+
+let activeTicketId = '';
+let activeToken = '';
+let activeFormId = '';
+let activeSubmissionId = '';
+let verifyInFlight = false;
+let tallyFrame = null;
+
+function setStatus(text, kind) {
+  statusNode.textContent = String(text || '');
+  statusNode.className = 'status' + (kind ? ' ' + kind : '');
+}
+
+function postApi(payload) {
+  return fetch(APPS_SCRIPT_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify(payload)
+  }).then(function (response) { return response.json(); });
+}
+
+function showTicketEntry(message, error) {
+  formShell.classList.remove('active');
+  retryButton.style.display = 'none';
+  entryForm.hidden = false;
+  entryNote.hidden = false;
+  ticketInput.value = activeTicketId || '';
+  setStatus(message || 'Enter the ticket ID from your valid event ticket.', error ? 'error' : '');
+}
+
+function showAlreadyCompleted(at) {
+  formShell.classList.remove('active');
+  entryForm.hidden = true;
+  entryNote.hidden = true;
+  retryButton.style.display = 'none';
+  successBox.classList.add('active');
+  successTime.textContent = 'A verified evaluation has already recorded your time-out' + (at ? ' at ' + at + ' PHT.' : '.');
+  setStatus('Your time-out is already recorded.', 'success');
+  setTicketReturnLink();
+}
+
+function setTicketReturnLink() {
+  if (!activeTicketId) return;
+  const target = new URL('../ticket.html', location.href);
+  target.searchParams.set('t', activeTicketId);
+  backTicket.href = target.href;
+  returnTicket.href = target.href;
+  returnTicket.style.display = successBox.classList.contains('active') ? 'none' : 'inline-flex';
+}
+
+function startEvaluation(ticketId) {
+  activeTicketId = String(ticketId || '').trim().toUpperCase();
+  if (!/^HS26-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(activeTicketId)) {
+    showTicketEntry('That does not look like a valid ticket ID. Check the printed ticket ID and try again.', true);
+    return Promise.resolve();
+  }
+  setTicketReturnLink();
+  continueButton.disabled = true;
+  setStatus('Verifying ticket and check-in…', 'busy');
+  return postApi({ action: 'evaluationStart', id: activeTicketId }).then(function (result) {
+    if (result.status === 'completed') {
+      showAlreadyCompleted(result.timedOutAt || '');
+      return;
+    }
+    if (result.status === 'not_checked_in') {
+      showTicketEntry('There is no recorded check-in for this ticket, so a time-out cannot be recorded yet. Please see event staff.', true);
+      return;
+    }
+    if (result.status === 'not_found' || result.status === 'invalid_ticket') {
+      showTicketEntry('Ticket not found. Use the ticket ID on your valid event ticket or ask event staff.', true);
+      return;
+    }
+    if (result.status === 'setup_required') {
+      showTicketEntry('The evaluation service is not configured or published yet. Please contact event staff; your ticket and check-in remain unchanged.', true);
+      return;
+    }
+    if (result.status !== 'ok' || !result.token || !result.formId) {
+      showTicketEntry('Could not start the evaluation right now. Your check-in record is unchanged. Please try again or contact event staff.', true);
+      return;
+    }
+    activeToken = String(result.token);
+    activeFormId = String(result.formId);
+    if (!/^[A-Fa-f0-9]{64}$/.test(activeToken) || !/^[A-Za-z0-9_-]+$/.test(activeFormId)) {
+      activeToken = '';
+      activeFormId = '';
+      showTicketEntry('The evaluation link could not be verified. Please contact event staff.', true);
+      return;
+    }
+    entryForm.hidden = true;
+    entryNote.hidden = true;
+    successBox.classList.remove('active');
+    retryButton.style.display = 'none';
+    history.replaceState(null, '', location.pathname);
+    setStatus('Complete every required rubric rating in Tally. Your timeout will appear here after Tally verifies the response.', '');
+    loadEvaluationForm();
+  }).catch(function () {
+    showTicketEntry('Could not reach the registration server. Check your connection and try again; no check-in or timeout record was changed.', true);
+  }).finally(function () {
+    continueButton.disabled = false;
+  });
+}
+
+function loadTallyWidget() {
+  if (window.Tally && typeof window.Tally.loadEmbeds === 'function') return Promise.resolve();
+  return new Promise(function (resolve, reject) {
+    let script = document.querySelector('script[data-tally-widget]');
+    if (script) {
+      script.addEventListener('load', resolve, { once: true });
+      script.addEventListener('error', reject, { once: true });
+      return;
+    }
+    script = document.createElement('script');
+    script.src = TALLY_WIDGET_URL;
+    script.async = true;
+    script.dataset.tallyWidget = 'true';
+    script.onload = resolve;
+    script.onerror = reject;
+    document.head.appendChild(script);
+  });
+}
+
+function loadEvaluationForm() {
+  formShell.replaceChildren();
+  tallyFrame = document.createElement('iframe');
+  tallyFrame.title = 'PSG Uniwide event evaluation';
+  tallyFrame.loading = 'lazy';
+  tallyFrame.width = '100%';
+  tallyFrame.height = '1300';
+  tallyFrame.setAttribute('frameborder', '0');
+  tallyFrame.setAttribute('marginheight', '0');
+  tallyFrame.setAttribute('marginwidth', '0');
+  const query = new URLSearchParams({
+    alignLeft: '1', hideTitle: '1', transparentBackground: '1', dynamicHeight: '1',
+    timeout_token: activeToken
+  });
+  tallyFrame.dataset.tallySrc = TALLY_EMBED_BASE + encodeURIComponent(activeFormId) + '?' + query.toString();
+  formShell.appendChild(tallyFrame);
+  formShell.classList.add('active');
+  loadTallyWidget().then(function () {
+    if (!window.Tally || typeof window.Tally.loadEmbeds !== 'function') throw new Error('Tally embed runtime unavailable');
+    window.Tally.loadEmbeds();
+  }).catch(function () {
+    formShell.classList.remove('active');
+    setStatus('The Tally form could not load. Check the connection and reload this page; no timeout has been recorded.', 'error');
+  });
+}
+
+function decodeTallyMessage(raw) {
+  if (raw && typeof raw === 'object') return raw;
+  if (typeof raw !== 'string') return null;
+  try { return JSON.parse(raw); } catch (e) { return null; }
+}
+
+window.addEventListener('message', function (event) {
+  if (!tallyFrame || event.origin !== 'https://tally.so' || event.source !== tallyFrame.contentWindow) return;
+  const data = decodeTallyMessage(event.data);
+  if (!data || data.type !== 'Tally.FormSubmitted') return;
+  const payload = data.payload || {};
+  if (String(payload.formId || '') !== activeFormId) return;
+  const submissionId = String(payload.id || payload.submissionId || payload.responseId || '').trim();
+  if (!submissionId || verifyInFlight) return;
+  activeSubmissionId = submissionId;
+  verifySubmission();
+});
+
+function delay(ms) { return new Promise(function (resolve) { setTimeout(resolve, ms); }); }
+
+async function verifySubmission() {
+  if (verifyInFlight || !activeToken || !activeSubmissionId) return;
+  verifyInFlight = true;
+  retryButton.style.display = 'none';
+  setStatus('Tally received your response. Verifying it and recording your timeout…', 'busy');
+  try {
+    for (let attempt = 0; attempt < 12; attempt++) {
+      const result = await postApi({ action: 'evaluationComplete', token: activeToken, submissionId: activeSubmissionId });
+      if (result.status === 'ok' || result.status === 'completed') {
+        formShell.classList.remove('active');
+        entryForm.hidden = true;
+        entryNote.hidden = true;
+        successBox.classList.add('active');
+        successTime.textContent = 'Your Tally evaluation was verified. Timeout recorded' + (result.timedOutAt ? ' at ' + result.timedOutAt + ' PHT.' : '.');
+        setStatus('Your timeout is confirmed in the event record.', 'success');
+        retryButton.style.display = 'none';
+        setTicketReturnLink();
+        activeToken = '';
+        return;
+      }
+      if (result.status === 'pending') {
+        await delay(1800);
+        continue;
+      }
+      if (result.status === 'session_used') {
+        setStatus('This evaluation session was already used. Reload from your ticket to check whether your timeout was recorded.', 'error');
+      } else if (result.status === 'expired') {
+        setStatus('The verification window expired before the Tally response could be confirmed. Please reopen the evaluation from your ticket and submit again.', 'error');
+      } else if (result.status === 'setup_required') {
+        setStatus('Tally verification is unavailable. Your response may be saved in Tally, but no timeout was recorded; please show this page to event staff.', 'error');
+      } else {
+        setStatus('The Tally response could not be verified, so no timeout was recorded. Please show this page to event staff rather than submitting repeatedly.', 'error');
+      }
+      retryButton.style.display = activeSubmissionId ? 'inline-flex' : 'none';
+      return;
+    }
+    setStatus('Tally accepted the response, but verification is still pending. Keep this page open and retry; the timeout is not confirmed until this page says it is recorded.', 'error');
+    retryButton.style.display = 'inline-flex';
+  } catch (e) {
+    setStatus('Could not confirm the Tally response because the server connection failed. Retry verification; do not submit the form again yet.', 'error');
+    retryButton.style.display = 'inline-flex';
+  } finally {
+    verifyInFlight = false;
+  }
+}
+
+retryButton.addEventListener('click', verifySubmission);
+entryForm.addEventListener('submit', function (event) {
+  event.preventDefault();
+  startEvaluation(ticketInput.value);
+});
+
+document.addEventListener('DOMContentLoaded', function () {
+  const params = new URLSearchParams(location.search);
+  const ticketId = String(params.get('t') || '').trim();
+  if (ticketId) {
+    activeTicketId = ticketId.toUpperCase();
+    history.replaceState(null, '', location.pathname);
+    startEvaluation(activeTicketId);
+  } else {
+    showTicketEntry('Enter the ticket ID from your valid event ticket to begin.', false);
+  }
+});
+</script>
+</body>
+</html>
