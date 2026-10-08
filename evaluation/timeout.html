@@ -268,7 +268,7 @@ function loadEvaluationForm() {
   tallyFrame.setAttribute('marginheight', '0');
   tallyFrame.setAttribute('marginwidth', '0');
   const query = new URLSearchParams({
-    alignLeft: '1', hideTitle: '1', transparentBackground: '1', dynamicHeight: '1',
+    alignLeft: '1', hideTitle: '1', dynamicHeight: '1',
     timeout_token: activeToken
   });
   tallyFrame.dataset.tallySrc = TALLY_EMBED_BASE + encodeURIComponent(activeFormId) + '?' + query.toString();
