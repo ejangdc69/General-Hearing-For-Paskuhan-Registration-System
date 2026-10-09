@@ -41,7 +41,7 @@
     background: rgba(8,31,21,.66); box-shadow: 0 14px 38px rgba(0,0,0,.28), inset 0 1px 0 rgba(244,245,237,.12);
   }
   .status {
-    min-height: 26px; margin: 0 0 14px; color: var(--muted); font-size: 14px; line-height: 1.55;
+    min-height: 26px; margin: 0 0 14px; color: var(--muted); font-size: 14px; line-height: 1.55; white-space: pre-line;
   }
   .status.error { color: var(--error); }
   .status.success { color: var(--success); }
@@ -125,6 +125,7 @@
 const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyqBLqb3GVID6di3TkB-1GLXgMVxyAgWeUL1ErqukfO2xO_b-_ehl05nloDBbTMuVBj/exec';
 const TALLY_EMBED_BASE = 'https://tally.so/embed/';
 const TALLY_WIDGET_URL = 'https://tally.so/widgets/embed.js';
+const TIMEOUT_CLOSED_MESSAGE = 'Leaving so soon? ah ah ah. not so fast, comrade!\ntimeout is at the END of the event, not after checking in!';
 const statusNode = document.getElementById('status');
 const entryForm = document.getElementById('ticket-entry');
 const entryNote = document.getElementById('entry-note');
@@ -198,6 +199,10 @@ function startEvaluation(ticketId) {
   return postApi({ action: 'evaluationStart', id: activeTicketId }).then(function (result) {
     if (result.status === 'completed') {
       showAlreadyCompleted(result.timedOutAt || '');
+      return;
+    }
+    if (result.status === 'timeout_closed') {
+      showTicketEntry(TIMEOUT_CLOSED_MESSAGE, true);
       return;
     }
     if (result.status === 'not_checked_in') {
@@ -326,6 +331,17 @@ async function verifySubmission() {
       if (result.status === 'pending') {
         await delay(1800);
         continue;
+      }
+      if (result.status === 'timeout_closed') {
+        formShell.classList.remove('active');
+        formShell.replaceChildren();
+        tallyFrame = null;
+        setStatus(TIMEOUT_CLOSED_MESSAGE + '\nA Tally response may have been saved, but no timeout was recorded. Please contact event staff.', 'error');
+        retryButton.style.display = 'none';
+        activeToken = '';
+        activeFormId = '';
+        activeSubmissionId = '';
+        return;
       }
       if (result.status === 'session_used') {
         setStatus('This evaluation session was already used. Reload from your ticket to check whether your timeout was recorded.', 'error');
