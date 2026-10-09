@@ -103,6 +103,10 @@
   .state-pill.on { background: rgba(46,158,106,0.32); color: var(--sys-hi); }
   .state-pill.off { background: rgba(141,61,52,0.4); color: #F0A79E; }
   .state-pill.sched { background: rgba(147,110,47,0.4); color: var(--gold); }
+  .switch-row[data-timeout-lock] [data-pill].off {
+    border: 1px solid rgba(255,228,224,0.92); background: rgba(141,61,52,0.62);
+    color: #FFE4E0; box-shadow: 0 0 0 1px rgba(255,228,224,0.2);
+  }
   .switch-row[data-key="checkInOn"] [data-pill].off {
     border: 1px solid rgba(240,167,158,0.88);
     box-shadow: 0 0 0 1px rgba(240,167,158,0.36), 0 0 12px rgba(240,167,158,0.28);
@@ -296,6 +300,18 @@
           <input type="datetime-local" data-start> to <input type="datetime-local" data-end>
           <button class="btn ghost" data-savesched>Set window</button>
         </div>
+      </div>
+
+      <div class="switch-row" data-timeout-lock>
+        <div class="sw-label">
+          <b>Event timeout (KILL SWITCH)</b>
+          <span>OFF blocks new starts and invalidates sessions opened before closing.</span>
+        </div>
+        <div class="row">
+          <span class="state-pill off" data-pill aria-live="polite">CLOSED</span>
+          <button class="btn" type="button" data-timeout-flip aria-pressed="false" aria-label="Open the event timeout">Open / close</button>
+        </div>
+        <div class="note" style="flex-basis:100%;margin-top:0;">A Tally response submitted after closure may remain in Tally, but will not be recorded as a timeout.</div>
       </div>
 
       <div class="switch-row" data-key="agendaOn">
@@ -771,6 +787,20 @@ function renderState(d, options) {
     }
   });
 
+  const timeoutRow = document.querySelector('[data-timeout-lock]');
+  if (timeoutRow) {
+    const timeoutOpen = d.effective.timeoutOn === true;
+    const timeoutPill = timeoutRow.querySelector('[data-pill]');
+    const timeoutButton = timeoutRow.querySelector('[data-timeout-flip]');
+    timeoutPill.textContent = timeoutOpen ? 'OPEN' : 'CLOSED';
+    timeoutPill.className = 'state-pill ' + (timeoutOpen ? 'on' : 'off');
+    if (timeoutButton.dataset.actionBusy !== 'true') {
+      timeoutButton.textContent = timeoutOpen ? 'Close timeout' : 'Open timeout';
+    }
+    timeoutButton.setAttribute('aria-pressed', String(timeoutOpen));
+    timeoutButton.setAttribute('aria-label', timeoutOpen ? 'Close event evaluation timeout' : 'Open event evaluation timeout');
+  }
+
   const sb = document.getElementById('staff-box');
   sb.innerHTML = '';
   d.staff.forEach(function (s) {
@@ -896,6 +926,28 @@ document.querySelectorAll('.switch-row[data-key]').forEach(function (row) {
       } finally { refreshAfterWrite(action); }
     }, null, row, { writeAction: true });
   });
+});
+
+const timeoutLockRow = document.querySelector('[data-timeout-lock]');
+const timeoutLockButton = timeoutLockRow.querySelector('[data-timeout-flip]');
+timeoutLockButton.addEventListener('click', function () {
+  runAction(timeoutLockButton, 'Saving…', async function (action) {
+    try {
+      const current = await api({ action: 'admin', op: 'state', pin: PIN });
+      if (action.expired) return;
+      if (!current || current.status !== 'ok' || !current.effective) {
+        throw new Error('Could not confirm the current timeout state.');
+      }
+      const next = current.effective.timeoutOn !== true;
+      await setKey('timeoutOn', next ? 'true' : 'false', action);
+      if (action.expired) return;
+      msg('Event timeout is now ' + (next ? 'OPEN' : 'CLOSED') + '. Logged.');
+    } catch (e) {
+      if (!isWriteTimeout(e)) msg('Failed: ' + e.message, true);
+    } finally {
+      refreshAfterWrite(action);
+    }
+  }, null, timeoutLockRow, { writeAction: true });
 });
 
 document.getElementById('cap-save').addEventListener('click', function () {
